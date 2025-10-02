@@ -101,7 +101,7 @@
     #word-widget .phonetic{color:var(--text-muted)}
     #word-widget .definition{font-size:.98rem; line-height:1.55}
     #quote-widget .quote-content{font-style:italic; border-left:3px solid var(--accent); padding-left:12px}
-    #quote-widget .quote-author{font-weight:700; text-align:right; color:var(--text-muted)}
+    #quote-widget .quote-author{font-weight:700; text-align:right; color:#6B7280}
 
     /* News */
     .news-container{flex:1; padding:22px; overflow-y:auto}
@@ -132,6 +132,30 @@
       padding-right:100%; animation:ticker 150s linear infinite; color:var(--text-muted)}
     .ticker-item{display:inline-block; padding:0 2rem}
     @keyframes ticker{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-100%,0,0)}}
+
+    /* -------- Smooth, per-block crossfades -------- */
+    .fade-host { position: relative; }
+    .fade-host > * { will-change: opacity, transform; }
+
+    .fade-enter { opacity:0; transform: translateY(6px); }
+    .fade-enter.fade-enter-active {
+      opacity:1; transform:none;
+      transition: opacity .35s ease, transform .35s ease;
+    }
+
+    .fade-exit { opacity:1; transform:none; }
+    .fade-exit.fade-exit-active {
+      opacity:0; transform: translateY(-6px);
+      transition: opacity .28s ease, transform .28s ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-enter, .fade-enter-active,
+      .fade-exit,  .fade-exit-active {
+        transition: none !important;
+        transform: none !important;
+      }
+    }
 
     /* Small screens */
     @media (max-width: 960px){
@@ -175,8 +199,8 @@
       </header>
 
       <div class="news-container">
-        <main id="featured-article"></main>
-        <section id="grid-container"></section>
+        <main id="featured-article" class="fade-host"></main>
+        <section id="grid-container" class="fade-host"></section>
       </div>
     </div>
   </div>
@@ -268,7 +292,7 @@
       const lastSpace = cut.lastIndexOf(' ');
       return (lastSpace>0 ? cut.substr(0,lastSpace) : cut) + '…';
     }
-    // Ensure global availability to avoid "not defined" in any scope/bundler situation
+    // Ensure global availability
     window.truncateText = truncateText;
 
     function getWeatherIcon(wmoCode){
@@ -286,6 +310,44 @@
       i = seconds/3600; if (i>=1) return Math.floor(i)+" hours ago";
       i = seconds/60; if (i>=1) return Math.floor(i)+" minutes ago";
       return Math.floor(seconds) + " seconds ago";
+    }
+
+    /* -------- Crossfade helpers (per-block, no full-page flashing) -------- */
+    function renderArticleNode(item, type) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = renderArticle(item, type).trim();
+      return wrapper.firstElementChild;
+    }
+
+    function crossfadeReplace(host, nextNode) {
+      const prev = host.firstElementChild;
+
+      // Prepare entering node
+      nextNode.classList.add('fade-enter');
+      host.insertBefore(nextNode, prev || null); // on top
+
+      // Force reflow so transition triggers
+      // eslint-disable-next-line no-unused-expressions
+      nextNode.offsetHeight;
+
+      // Animate in
+      nextNode.classList.add('fade-enter-active');
+
+      // Animate out old (if any), then remove
+      if (prev) {
+        prev.classList.add('fade-exit');
+        // eslint-disable-next-line no-unused-expressions
+        prev.offsetHeight;
+        prev.classList.add('fade-exit-active');
+        prev.addEventListener('transitionend', () => {
+          if (prev && prev.parentNode === host) prev.remove();
+        }, { once: true });
+      }
+
+      // Cleanup classes after enter finishes
+      nextNode.addEventListener('transitionend', () => {
+        nextNode.classList.remove('fade-enter', 'fade-enter-active');
+      }, { once: true });
     }
 
     /* ========================== WEATHER ========================== */
@@ -428,8 +490,7 @@
         }
 
         if(results.length===0){
-          featuredContainer.innerHTML = '';
-          gridContainer.innerHTML = '';
+          // Don't clear featured/grid to avoid flash; just update ticker statefully
           newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost.</span>';
           return;
         }
@@ -452,9 +513,15 @@
         top.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
 
         articlesPool = top.slice(0,30);
+
+        // Update ticker without flashing the page
         newsTicker.innerHTML = `<span class="ticker-item">${articlesPool.map(i => `••• ${i.title} `).join('')}</span>`;
 
-        if(articlesPool.length>0){ currentArticleIndex=0; rotateArticles(); }
+        // Gentle swap for what's visible
+        if(articlesPool.length>0){
+          currentArticleIndex = 0;
+          rotateArticles();
+        }
       }catch(e){
         console.error("News error:", e);
         newsTicker.innerHTML = '<span class="ticker-item">News unavailable.</span>';
@@ -462,25 +529,24 @@
     }
 
     function rotateArticles(){
-      if(articlesPool.length===0) return;
-      featuredContainer.style.opacity = 0;
-      gridContainer.style.opacity = 0;
-      setTimeout(()=>{
-        currentArticleIndex = currentArticleIndex % articlesPool.length;
-        const featured = articlesPool[currentArticleIndex];
-        featuredContainer.innerHTML = renderArticle(featured, 'featured');
+      if (articlesPool.length === 0) return;
 
-        let gridHtml = '';
-        for(let i=1;i<=4;i++){
-          const idx = (currentArticleIndex + i) % articlesPool.length;
-          gridHtml += renderArticle(articlesPool[idx], 'grid');
-        }
-        gridContainer.innerHTML = gridHtml;
+      currentArticleIndex = currentArticleIndex % articlesPool.length;
+      const featured = articlesPool[currentArticleIndex];
 
-        featuredContainer.style.opacity = 1;
-        gridContainer.style.opacity = 1;
-        currentArticleIndex++;
-      }, 350);
+      // Build the new featured node and crossfade it in
+      const nextFeaturedNode = renderArticleNode(featured, 'featured');
+      crossfadeReplace(featuredContainer, nextFeaturedNode);
+
+      // Build the new grid (4 items) as a fragment and crossfade the whole grid block
+      const gridWrapper = document.createElement('div');
+      for (let i = 1; i <= 4; i++){
+        const idx = (currentArticleIndex + i) % articlesPool.length;
+        gridWrapper.appendChild(renderArticleNode(articlesPool[idx], 'grid'));
+      }
+      crossfadeReplace(gridContainer, gridWrapper);
+
+      currentArticleIndex++;
     }
 
     function renderArticle(item, type) {
@@ -564,7 +630,7 @@
           }
           throw new Error('Proxy shape');
         } catch (e2) {
-          // Final fallback: Quotable (reliable CORS)
+          // Final fallback: Quotable
           try{
             const res3 = await fetch('https://api.quotable.io/random');
             if (!res3.ok) throw new Error(`Quotable ${res3.status}`);
