@@ -227,16 +227,25 @@
     const quoteContent      = document.getElementById('quote-content');
 
     /* ========================== UTIL ========================== */
-    function updateClock(){ clockElement.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+    function updateClock(){
+  const now = new Date();
+  
+  const options = {hour:'2-digit', minute:'2-digit'};
+  
+  const local = now.toLocaleTimeString([], options);
+  const cst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Chicago'});
+  const mst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Denver'});
+  const pst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Los_Angeles'});
+  
+  clockElement.innerHTML = `
+    <div><strong>Local:</strong> ${local}</div>
+    <div><strong>EST:</strong> ${est}</div>
+    <div><strong>CST:</strong> ${cst}</div>
+    <div><strong>MST:</strong> ${mst}</div>
+    <div><strong>PST:</strong> ${pst}</div>
+  `;
+}
 
-    function truncateText(text, maxLength){
-      if(!text) return '';
-      const cleaned = text.replace(/<[^>]*>/g,'');
-      if(cleaned.length<=maxLength) return cleaned;
-      const cut = cleaned.substr(0, maxLength);
-      const lastSpace = cut.lastIndexOf(' ');
-      return (lastSpace>0 ? cut.substr(0,lastSpace) : cut) + '…';
-    }
 
     function getWeatherIcon(wmoCode){
       const icons = {'0':'☀️','1':'🌤️','2':'☁️','3':'☁️','45':'🌫️','48':'🌫️','51':'🌧️','53':'🌧️','55':'🌧️','61':'🌧️','63':'🌧️','65':'🌧️','80':'🌦️','81':'🌦️','82':'🌦️','95':'⛈️','96':'⛈️','99':'⛈️'};
@@ -582,4 +591,5 @@
     setInterval(fetchWordOfTheDay, 60 * 60 * 1000); // Every hour
   </script>
 </body>
+
 </html>
