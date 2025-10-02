@@ -103,12 +103,14 @@
     #quote-widget .quote-content{font-style:italic; border-left:3px solid var(--accent); padding-left:12px}
     #quote-widget .quote-author{font-weight:700; text-align:right; color:#6B7280}
 
-    /* News */
+    /* News layout containers */
     .news-container{flex:1; padding:22px; overflow-y:auto}
     #featured-article,#grid-container{transition:opacity .35s ease}
     #featured-article{margin-bottom:22px}
-    #grid-container{display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:18px}
+    /* grid-container hosts crossfades; the actual grid is the child wrapper we swap in */
+    #grid-container{position:relative; min-height:200px;}
 
+    /* Cards */
     .card{
       background:var(--panel-bg); border:1px solid var(--border-color);
       border-radius:14px; overflow:hidden; display:flex; box-shadow:var(--shadow);
@@ -147,6 +149,13 @@
     .fade-exit.fade-exit-active {
       opacity:0; transform: translateY(-6px);
       transition: opacity .28s ease, transform .28s ease;
+    }
+
+    /* New grid wrapper to keep row layout while crossfading */
+    .grid-swap{
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));
+      gap:18px;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -490,7 +499,7 @@
         }
 
         if(results.length===0){
-          // Don't clear featured/grid to avoid flash; just update ticker statefully
+          // Don't clear featured/grid to avoid flash; just update ticker
           newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost.</span>';
           return;
         }
@@ -534,12 +543,13 @@
       currentArticleIndex = currentArticleIndex % articlesPool.length;
       const featured = articlesPool[currentArticleIndex];
 
-      // Build the new featured node and crossfade it in
+      // Featured article (crossfade single card)
       const nextFeaturedNode = renderArticleNode(featured, 'featured');
       crossfadeReplace(featuredContainer, nextFeaturedNode);
 
-      // Build the new grid (4 items) as a fragment and crossfade the whole grid block
+      // Grid articles (swap a wrapper that IS a grid, so cards stay in rows)
       const gridWrapper = document.createElement('div');
+      gridWrapper.className = 'grid-swap';
       for (let i = 1; i <= 4; i++){
         const idx = (currentArticleIndex + i) % articlesPool.length;
         gridWrapper.appendChild(renderArticleNode(articlesPool[idx], 'grid'));
