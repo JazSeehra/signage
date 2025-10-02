@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ignite Digital — Tech & Marketing Briefing</title>
+  <style>
+    :root{
+      --brand-orange:#EF7F2B;
+      --brand-white:#FFFFFF;
+      --brand-gray:#A7A8AC;
+
+      /* Light UI */
+      --bg-color:#F7F9FC;
+      --panel-bg:#FFFFFF;
+      --panel-subtle:#FAFBFD;
+      --border-color:#E4E7EC;
+      --text-color:#1E293B;
+      --text-muted:#6B7280;
+      --accent:var(--brand-orange);
+      --shadow:0 8px 24px rgba(16,24,40,0.08);
+
+      --price-up:#157347;
+      --price-down:#C02B2B;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; height:100vh; overflow:hidden;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      color:var(--text-color); background:var(--bg-color);
+      /* Fix Starts Here: Use Flexbox for page layout */
+      display:flex;
+      flex-direction:column;
+    }
+
+    /* Error banner */
+    #errbar{
+      display:none; position:fixed; top:0; left:0; right:0; z-index:9999;
+      background:#fff4f4; color:#7a1111; border-bottom:1px solid #f2caca;
+      padding:8px 12px; font-size:14px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    #errbar strong{margin-right:8px}
+
+    .dashboard-container{
+      display:flex;
+      flex:1; /* Fix: This makes the container fill available space, leaving room for the footer */
+      overflow:hidden;
+    }
+    .sidebar{
+      width:360px; background:var(--panel-bg); border-right:1px solid var(--border-color);
+      padding:22px; display:flex; flex-direction:column; gap:18px; overflow-y:auto;
+    }
+    .main-content{flex:1; display:flex; flex-direction:column; overflow:hidden}
+
+    .header{
+      display:flex; justify-content:space-between; align-items:center; gap:16px;
+      background:var(--panel-bg); border-bottom:1px solid var(--border-color); padding:14px 26px;
+    }
+    .brand{display:flex; align-items:center; gap:12px}
+    .brand img{height:36px; width:auto; display:block}
+    .brand h1{margin:0; font-size:1.1rem; font-weight:800; color:#111827}
+    #clock{font-weight:700; color:#334155}
+
+    .widget{
+      background:var(--panel-bg); border:1px solid var(--border-color);
+      border-radius:14px; padding:16px; box-shadow:var(--shadow);
+    }
+    .widget-title{
+      margin:0 0 12px 0; padding-bottom:10px;
+      font-size:.98rem; font-weight:800; color:#111827;
+      border-bottom:1px solid #EEF2F6;
+    }
+
+    /* Weather */
+    #weather-widget .temp-main{font-size:3rem; font-weight:800; text-align:center}
+    #weather-widget .weather-desc{font-size:1.1rem; text-align:center; margin:-4px 0 8px 0}
+    #weather-widget .temp-range{font-size:.95rem; text-align:center; color:var(--text-muted)}
+
+    /* Stocks */
+    #stock-ticker .stock-item{
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:10px; padding:8px 10px; border-radius:10px;
+      background:var(--panel-subtle); border:1px solid var(--border-color);
+    }
+    #stock-ticker .stock-symbol{font-weight:800}
+    .price-up{color:var(--price-up)} .price-down{color:var(--price-down)}
+
+    /* Word & Quote */
+    #word-widget .word{font-size:1.2rem; font-weight:800; color:var(--accent)}
+    #word-widget .phonetic{color:var(--text-muted)}
+    #word-widget .definition{font-size:.98rem; line-height:1.55}
+    #quote-widget .quote-content{font-style:italic; border-left:3px solid var(--accent); padding-left:12px}
+    #quote-widget .quote-author{font-weight:700; text-align:right; color:var(--text-muted)}
+
+    /* News */
+    .news-container{flex:1; padding:22px; overflow-y:auto}
+    #featured-article,#grid-container{transition:opacity .35s ease}
+    #featured-article{margin-bottom:22px}
+    #grid-container{display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:18px}
+
+    .card{
+      background:var(--panel-bg); border:1px solid var(--border-color);
+      border-radius:14px; overflow:hidden; display:flex; box-shadow:var(--shadow);
+    }
+    .featured-card{flex-direction:row; min-height:240px}
+    .featured-card .article-image{width:45%; object-fit:cover}
+    .grid-card{flex-direction:column}
+    .grid-card .article-image{width:100%; height:170px; object-fit:cover}
+    .article-content{padding:16px; display:flex; flex-direction:column}
+    .article-header{display:flex; justify-content:space-between; margin-bottom:8px}
+    .source-label{background:var(--accent); color:#fff; padding:4px 10px; border-radius:12px; font-size:.75rem; font-weight:800}
+    .time-ago{font-size:.82rem; color:var(--text-muted)}
+    .article-title a{color:#0F172A; text-decoration:none; font-weight:800}
+    .article-title a:hover{color:var(--accent)}
+    .article-summary{color:#475569; font-size:.95rem}
+
+    /* Ticker */
+    .ticker-wrap{width:100%; overflow:hidden; height:46px; background:var(--panel-bg);
+      border-top:1px solid var(--border-color); padding-left:100%}
+    .ticker-move{display:inline-block; height:46px; line-height:46px; white-space:nowrap;
+      padding-right:100%; animation:ticker 150s linear infinite; color:var(--text-muted)}
+    .ticker-item{display:inline-block; padding:0 2rem}
+    @keyframes ticker{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-100%,0,0)}}
+
+    /* Small screens */
+    @media (max-width: 960px){
+      .sidebar{width:100%; order:2; flex-direction:row; flex-wrap:wrap; gap:12px}
+      .widget{flex:1 1 320px}
+      .featured-card{flex-direction:column}
+      .featured-card .article-image{width:100%; height:200px}
+    }
+  </style>
+</head>
+<body>
+  <div id="errbar"><strong>Script error:</strong><span id="errtxt"></span></div>
+
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div id="weather-widget" class="widget">
+        <h3 class="widget-title">Mississauga, ON</h3>
+        <div id="weather-content"></div>
+      </div>
+      <div id="quote-widget" class="widget">
+        <h3 class="widget-title">Quote</h3>
+        <div id="quote-content"></div>
+      </div>
+      <div id="word-widget" class="widget">
+        <h3 class="widget-title">Word of the Day</h3>
+        <div id="word-content"></div>
+      </div>
+      <div id="stock-ticker" class="widget">
+        <h3 class="widget-title">Tech Market</h3>
+        <div id="stock-content"></div>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="header">
+        <div class="brand">
+          <img src="https://ignitedigital.com/wp-content/uploads/2025/07/Ignite-Digital-Logo.png" alt="Ignite Digital logo" />
+        <h1>Tech & Marketing Briefing</h1>
+        </div>
+        <div id="clock"></div>
+      </header>
+
+      <div class="news-container">
+        <main id="featured-article"></main>
+        <section id="grid-container"></section>
+      </div>
+    </div>
+  </div>
+
+  <footer class="ticker-wrap">
+    <div class="ticker-move" id="news-ticker"></div>
+  </footer>
+
+  <script>
+    /* ===== Error banner so a tiny bug doesn’t look like “blank page” ===== */
+    (function(){
+      const bar = document.getElementById('errbar');
+      const txt = document.getElementById('errtxt');
+      window.addEventListener('error', e=>{
+        bar.style.display='block';
+        txt.textContent = (e.message||'') + (e.filename? ' @ ' + e.filename : '') + (e.lineno? ':'+e.lineno:'');
+      });
+      window.addEventListener('unhandledrejection', e=>{
+        bar.style.display='block';
+        txt.textContent = (e.reason && e.reason.message) ? e.reason.message : (''+e.reason);
+      });
+    })();
+
+    /* ========================== CONFIG ========================== */
+    const twelveDataApiKey = 'b261e31044ad48e387824a23d233e05a';
+    const stockSymbols = ['AAPL','MSFT','GOOGL','NVDA'];
+
+    // AI / AIO / SEO / Marketing first, a touch of general tech
+    const feedUrls = [
+      "https://venturebeat.com/category/ai/feed/",
+      "https://www.marktechpost.com/feed/",
+      "https://www.syncedreview.com/feed/",
+      "https://www.artificialintelligence-news.com/feed/",
+      "https://www.searchenginejournal.com/feed/",
+      "https://searchengineland.com/feed",
+      "https://moz.com/blog/feed",
+      "https://ahrefs.com/blog/feed/",
+      "https://www.contentmarketinginstitute.com/feed/",
+      "https://www.hubspot.com/insiders/rss.xml",
+      "https://www.socialmediatoday.com/.rss/full/",
+      "https://techcrunch.com/feed/",
+      "https://www.theverge.com/rss/index.xml"
+    ];
+
+    const latitude = 43.59, longitude = -79.64;
+    const dailyWords = ["ephemeral","ubiquitous","mellifluous","petrichor","serendipity","sonder","eloquence","solitude","ineffable","limerence","epoch","vestige","cynosure"];
+
+    let articlesPool = [];
+    let currentArticleIndex = 0;
+
+    const clockElement      = document.getElementById('clock');
+    const weatherContent    = document.getElementById('weather-content');
+    const stockContent      = document.getElementById('stock-content');
+    const featuredContainer = document.getElementById('featured-article');
+    const gridContainer     = document.getElementById('grid-container');
+    const newsTicker        = document.getElementById('news-ticker');
+    const wordContent       = document.getElementById('word-content');
+    const quoteContent      = document.getElementById('quote-content');
+
+    /* ========================== UTIL ========================== */
+    function updateClock(){ clockElement.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+
+    function truncateText(text, maxLength){
+      if(!text) return '';
+      const cleaned = text.replace(/<[^>]*>/g,'');
+      if(cleaned.length<=maxLength) return cleaned;
+      const cut = cleaned.substr(0, maxLength);
+      const lastSpace = cut.lastIndexOf(' ');
+      return (lastSpace>0 ? cut.substr(0,lastSpace) : cut) + '…';
+    }
+
+    function getWeatherIcon(wmoCode){
+      const icons = {'0':'☀️','1':'🌤️','2':'☁️','3':'☁️','45':'🌫️','48':'🌫️','51':'🌧️','53':'🌧️','55':'🌧️','61':'🌧️','63':'🌧️','65':'🌧️','80':'🌦️','81':'🌦️','82':'🌦️','95':'⛈️','96':'⛈️','99':'⛈️'};
+      return icons[wmoCode]||'—';
+    }
+
+    function formatTimeAgo(dateString){
+      const now = new Date(), past = new Date(dateString);
+      const seconds = Math.floor((now - past)/1000);
+      if (seconds < 60) return "just now";
+      let i = seconds/31536000; if (i>=1) return Math.floor(i)+" years ago";
+      i = seconds/2592000; if (i>=1) return Math.floor(i)+" months ago";
+      i = seconds/86400; if (i>=1) return Math.floor(i)+" days ago";
+      i = seconds/3600; if (i>=1) return Math.floor(i)+" hours ago";
+      i = seconds/60; if (i>=1) return Math.floor(i)+" minutes ago";
+      return Math.floor(seconds) + " seconds ago";
+    }
+
+    /* ========================== WEATHER ========================== */
+    async function fetchWeather(){
+      try{
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);
+        const data = await res.json();
+        if(!data || !data.current){ throw new Error('Weather API response empty'); }
+        weatherContent.innerHTML = `
+          <div class="temp-main">${Math.round(data.current.temperature_2m)}°</div>
+          <div class="weather-desc">${getWeatherIcon(String(data.current.weather_code))}</div>
+          <div class="temp-range">H: ${Math.round(data.daily.temperature_2m_max[0])}° &nbsp; L: ${Math.round(data.daily.temperature_2m_min[0])}°</div>
+        `;
+      }catch(e){
+        console.error("Weather error:", e);
+        weatherContent.innerHTML = `<small style="color:var(--text-muted)">Weather unavailable.</small>`;
+      }
+    }
+
+    /* ========================== STOCKS ========================== */
+    async function fetchStocks(){
+      if(!twelveDataApiKey || twelveDataApiKey === 'YOUR_TWELVE_DATA_API_KEY'){
+        stockContent.innerHTML = '<small style="color:var(--text-muted)">Add Twelve Data API Key</small>';
+        return;
+      }
+      try{
+        const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(stockSymbols.join(','))}&apikey=${encodeURIComponent(twelveDataApiKey)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const results = Array.isArray(data) ? data
+          : (typeof data === 'object' && data && !('symbol' in data)) ? Object.values(data)
+          : [data];
+
+        const ok = results.filter(s => s && !s.code && s.symbol);
+        if(ok.length===0){
+          const firstErr = results.find(s => s && s.code) || data;
+          const msg = (firstErr && (firstErr.message || firstErr.status)) || 'Stock data unavailable.';
+          throw new Error(msg);
+        }
+
+        stockContent.innerHTML = ok.map(stock=>{
+          const price = parseFloat(stock.close);
+          const change = parseFloat(stock.change);
+          const pct    = parseFloat(stock.percent_change);
+          const isUp = !isNaN(change) ? change>=0 : true;
+          const sign = isUp ? '+' : '';
+          return `
+            <div class="stock-item">
+              <div>
+                <div class="stock-symbol">${stock.symbol}</div>
+                <div class="stock-price">${isNaN(price)?'—':price.toFixed(2)}</div>
+              </div>
+              <div class="stock-change ${isUp?'price-up':'price-down'}">
+                <div>${isNaN(change)?'—':sign+change.toFixed(2)}</div>
+                <div>(${isNaN(pct)?'—':sign+pct.toFixed(2)}%)</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }catch(e){
+        console.error("Stocks error:", e);
+        stockContent.innerHTML = `<small>${e.message || 'Stock data unavailable.'}</small>`;
+      }
+    }
+
+    /* ========================== NEWS (scoring + images) ========================== */
+    const TOPIC_WEIGHTS = { ai:3.2, aio:2.6, seo:2.9, marketing:2.2, general:0.5 };
+    const TOPIC_KEYWORDS = {
+      ai:[" ai ","artificial intelligence","genai"," gpt","openai"," llm","large language model","machine learning"," ml ","deep learning","rag","vector db","agents","anthropic","copilot"],
+      aio:[" aio ","ai operations"," ai ops","marketing automation","workflow automation","prompt ops","content automation","auto-generate","auto generate"],
+      seo:[" seo ","search engine","serp","rankings","core update","algorithm update","link building","technical seo","schema","structured data","crawl","indexing","site reputation","eeat","helpful content"],
+      marketing:[" marketing ","growth","demand gen","content marketing","social media","campaign","email marketing","ppc","sem","paid search","google ads","facebook ads","tiktok ads","attribution","conversion rate"," cvr "," cac "," roas "],
+      general:["software","product","startup","funding","apps","hardware","cloud","saas"]
+    };
+    const SOURCE_BOOSTS = {
+      "Search Engine Journal":1.4, "Search Engine Land":1.3, "Moz":1.3, "Ahrefs":1.3,
+      "Content Marketing Institute":1.2, "VentureBeat":1.1
+    };
+
+    const SOURCE_LOGOS = {
+      "Search Engine Journal":"https://www.searchenginejournal.com/wp-content/themes/sej-2023/assets/img/favicons/android-chrome-192x192.png",
+      "Search Engine Land":"https://searchengineland.com/wp-content/uploads/2018/06/sel-favicon-192.png",
+      "Moz":"https://moz.com/images/favicon-196x196.png",
+      "Ahrefs":"https://ahrefs.com/favicon-196x196.png",
+      "Content Marketing Institute":"https://contentmarketinginstitute.com/wp-content/uploads/2017/05/cmi-favicon-192x192.png",
+      "VentureBeat":"https://venturebeat.com/wp-content/uploads/2019/03/cropped-vb-favicon-192x192.png",
+      "TechCrunch":"https://techcrunch.com/wp-content/uploads/2018/01/cropped-cropped-favicon-gradient-192x192.png",
+      "The Verge":"https://www.theverge.com/icons/android-chrome-192x192.png"
+    };
+
+    function normalizeUrl(u){
+      if(!u) return '';
+      if(u.startsWith('//')) return 'https:' + u;
+      if(u.startsWith('http://')) return u.replace(/^http:\/\//i,'https://');
+      return u;
+    }
+    function extractImgFromHtml(html){
+      if(!html) return '';
+      const m=html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      return m? m[1] : '';
+    }
+    function extractImageUrl(item){
+        const html = item.content || item.content_html || item.description || '';
+        const candidates = [
+            item.thumbnail,
+            item.enclosure && item.enclosure.link,
+            Array.isArray(item.enclosures) && item.enclosures.length ? item.enclosures[0].link : '',
+            extractImgFromHtml(html)
+        ].filter(Boolean);
+        // Return the first valid, normalized URL, or null if none are found.
+        return candidates.map(normalizeUrl).find(Boolean) || null;
+    }
+
+    function scoreArticle(item){
+      const hay = ` ${(item.title||"")} ${(item.description||"")} `.toLowerCase();
+      let score = 0;
+      for(const [topic, words] of Object.entries(TOPIC_KEYWORDS)){
+        const w = TOPIC_WEIGHTS[topic]||1;
+        for(const k of words){ if(hay.includes(k.toLowerCase())) score += w; }
+      }
+      const ageHrs = Math.max(1, (Date.now()-new Date(item.pubDate).getTime())/36e5);
+      score += Math.max(0, 4 - Math.log(ageHrs)); // recency
+      const src = (item.sourceName||"").trim();
+      if(SOURCE_BOOSTS[src]) score *= SOURCE_BOOSTS[src];
+      return score;
+    }
+
+    async function fetchNews(){
+      try{
+        // Fetch each feed with its own try/catch so one failure doesn’t kill all
+        const results = [];
+        for(const url of feedUrls){
+          try{
+            const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+            const feedData = await res.json();
+            if(feedData && feedData.status==='ok'){
+              const items = feedData.items.map(item => ({...item, sourceName: feedData.feed.title}));
+              results.push(...items);
+            }
+          }catch(fe){ console.warn('Feed failed:', url, fe); }
+        }
+
+        if(results.length===0){
+          featuredContainer.innerHTML = '';
+          gridContainer.innerHTML = '';
+          newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost (see note above).</span>';
+          return;
+        }
+
+        const scored = results.map(item => ({item, score: scoreArticle(item)}))
+                                .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
+
+        const TOP_N = 40;
+        let top = scored.slice(0, TOP_N).map(s=>s.item);
+
+        // Keep a bit of general tech for variety
+        const DIVERSITY_PERCENT = 0.12;
+        const generalTech = results
+          .filter(i => TOPIC_KEYWORDS.general.some(k => (`${i.title} ${i.description}`.toLowerCase().includes(k))))
+          .sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate))
+          .slice(0, Math.ceil(TOP_N * DIVERSITY_PERCENT));
+
+        const links = new Set(top.map(i=>i.link));
+        for(const g of generalTech){ if(!links.has(g.link)) top.push(g); }
+
+        top.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
+
+        articlesPool = top.slice(0,30);
+        newsTicker.innerHTML = `<span class="ticker-item">${articlesPool.map(i => `••• ${i.title} `).join('')}</span>`;
+
+        if(articlesPool.length>0){ currentArticleIndex=0; rotateArticles(); }
+      }catch(e){
+        console.error("News error:", e);
+        newsTicker.innerHTML = '<span class="ticker-item">News unavailable.</span>';
+      }
+    }
+
+    function rotateArticles(){
+      if(articlesPool.length===0) return;
+      featuredContainer.style.opacity = 0;
+      gridContainer.style.opacity = 0;
+      setTimeout(()=>{
+        currentArticleIndex = currentArticleIndex % articlesPool.length;
+        const featured = articlesPool[currentArticleIndex];
+        featuredContainer.innerHTML = renderArticle(featured, 'featured');
+
+        let gridHtml = '';
+        for(let i=1;i<=4;i++){
+          const idx = (currentArticleIndex + i) % articlesPool.length;
+          gridHtml += renderArticle(articlesPool[idx], 'grid');
+        }
+        gridContainer.innerHTML = gridHtml;
+
+        featuredContainer.style.opacity = 1;
+        gridContainer.style.opacity = 1;
+        currentArticleIndex++;
+      }, 350);
+    }
+    
+    function renderArticle(item, type) {
+        const summaryLen = type === 'featured' ? 190 : 90;
+        const srcName = (item.sourceName || "").trim();
+
+        const imageUrl = extractImageUrl(item);
+        let primarySrc;
+
+        if (imageUrl) {
+            primarySrc = imageUrl;
+        } else {
+            // Use picsum.photos for placeholders. The 'seed' ensures the same article gets the same image.
+            const seed = encodeURIComponent(item.title || item.link); // Use title or link as a seed
+            const width = type === 'featured' ? 720 : 400;
+            const height = type === 'featured' ? 405 : 225;
+            primarySrc = `https://picsum.photos/seed/${seed}/${width}/${height}`;
+        }
+
+        // Define a robust, multi-level fallback for the onerror event.
+        const finalFallback = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgZmlsbD0nI0YwRjJGNSAnPjwvcmVjdD48dGV4dCB4PSc1MCUnIHk9JzUwJScgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtc2l6ZT0nMjQnIGZpbGw9JyNBN0E4QUMnIHRleHQtYW5jaGyPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPkltYWdlIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==`;
+        const logoFallback = SOURCE_LOGOS[srcName] || finalFallback;
+
+        // 1. Try to load primarySrc (real image or Picsum placeholder).
+        // 2. On error, try to load the source's logo (logoFallback).
+        // 3. On a second error, load the final, ultra-reliable SVG fallback.
+        const img = `<img src="${primarySrc}" alt="" class="article-image" loading="lazy"
+            referrerpolicy="no-referrer"
+            onerror="this.onerror=null; this.src='${logoFallback}'; this.onerror=() => { this.src='${finalFallback}'; };">`;
+
+        return `<div class="card ${type}-card">
+          ${img}
+          <div class="article-content">
+              <div class="article-header">
+                  <span class="source-label">${item.sourceName}</span>
+                  <span class="time-ago">${formatTimeAgo(item.pubDate)}</span>
+              </div>
+              <h2 class="article-title"><a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a></h2>
+              <p class="article-summary">${truncateText(item.description, summaryLen)}</p>
+          </div>
+        </div>`;
+    }
+
+    /* ========================== QUOTE & WORD ========================== */
+	async function fetchQuote(){
+  try{
+    // Try ZenQuotes first
+    let res = await fetch('https://zenquotes.io/api/random');
+    if (!res.ok) throw new Error(`ZenQuotes ${res.status}`);
+
+    let data;
+    try { data = await res.json(); }
+    catch { throw new Error('ZenQuotes JSON parse'); }
+
+    const q = Array.isArray(data) ? data[0] : null;
+    if(!q || !q.q || !q.a) throw new Error('ZenQuotes shape');
+
+    quoteContent.innerHTML =
+      `<div class="quote-content">“${q.q}”</div><div class="quote-author">— ${q.a}</div>`;
+    return; // success
+  } catch (e1) {
+    // Attempt a CORS proxy (works when the API blocks your origin)
+    try{
+      const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://zenquotes.io/api/random')}`;
+      const res2 = await fetch(proxied);
+      if (!res2.ok) throw new Error(`Proxy ${res2.status}`);
+      const data2 = await res2.json();
+      const q2 = Array.isArray(data2) ? data2[0] : null;
+      if(q2 && q2.q && q2.a){
+        quoteContent.innerHTML =
+          `<div class="quote-content">“${q2.q}”</div><div class="quote-author">— ${q2.a}</div>`;
+        return;
+      }
+      throw new Error('Proxy shape');
+    } catch (e2) {
+      // Final fallback: Quotable (reliable CORS)
+      try{
+        const res3 = await fetch('https://api.quotable.io/random');
+        if (!res3.ok) throw new Error(`Quotable ${res3.status}`);
+        const d3 = await res3.json();
+        if(d3 && d3.content && d3.author){
+          quoteContent.innerHTML =
+            `<div class="quote-content">“${d3.content}”</div><div class="quote-author">— ${d3.author}</div>`;
+          return;
+        }
+      } catch {}
+    }
+  }
+  // If every path failed:
+  quoteContent.innerHTML = '<small style="color:var(--text-muted)">Quote unavailable.</small>';
+}
+
+
+    async function fetchWordOfTheDay(){
+      try{
+        const startOfYear = new Date(new Date().getFullYear(),0,0);
+        const diff = new Date() - startOfYear;
+        const dayOfYear = Math.floor(diff / (1000*60*60*24));
+        const word = dailyWords[dayOfYear % dailyWords.length];
+
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const data = await res.json();
+        const entry = Array.isArray(data) && data[0] ? data[0] : null;
+        if(!entry) throw new Error('No dictionary entry');
+        const def = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
+        const phon = entry.phonetic || '';
+        wordContent.innerHTML = `<div class="word">${word}</div><div class="phonetic">${phon}</div><div class="definition">${def}</div>`;
+      }catch(e){
+        console.warn("Word error:", e);
+        wordContent.innerHTML = '<small style="color:var(--text-muted)">Word unavailable.</small>';
+      }
+    }
+
+    /* ========================== INIT & TIMERS ========================== */
+    updateClock();
+    fetchWeather();
+    fetchStocks();
+    fetchNews();
+    fetchQuote();
+    fetchWordOfTheDay();
+
+    setInterval(updateClock, 1000); // Every second
+    setInterval(fetchWeather, 60 * 60 * 1000); // Every hour
+    setInterval(fetchStocks, 10 * 60 * 1000); // Every 10 minutes
+    setInterval(fetchNews, 30 * 60 * 1000); // Every 30 minutes
+    setInterval(rotateArticles, 30 * 1000); // Every 30 seconds
+    setInterval(fetchQuote, 10 * 60 * 1000); // Every 10 minutes
+    // FIX: Added the missing timer for the Word of the Day widget
+    setInterval(fetchWordOfTheDay, 60 * 60 * 1000); // Every hour
+  </script>
+</body>
+</html>
