@@ -29,7 +29,6 @@
       margin:0; height:100vh; overflow:hidden;
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
       color:var(--text-color); background:var(--bg-color);
-      /* Fix Starts Here: Use Flexbox for page layout */
       display:flex;
       flex-direction:column;
     }
@@ -44,7 +43,7 @@
 
     .dashboard-container{
       display:flex;
-      flex:1; /* Fix: This makes the container fill available space, leaving room for the footer */
+      flex:1;
       overflow:hidden;
     }
     .sidebar{
@@ -60,7 +59,18 @@
     .brand{display:flex; align-items:center; gap:12px}
     .brand img{height:36px; width:auto; display:block}
     .brand h1{margin:0; font-size:1.1rem; font-weight:800; color:#111827}
-    #clock{font-weight:700; color:#334155}
+
+    /* Clocks */
+    #clock{
+      display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end;
+      font-weight:700; color:#334155
+    }
+    #clock .tz{
+      display:flex; align-items:center; gap:6px;
+      background:var(--panel-subtle); border:1px solid var(--border-color);
+      padding:6px 10px; border-radius:12px; font-size:.9rem;
+    }
+    #clock .tz .tz-abbr{font-weight:800; color:#111827}
 
     .widget{
       background:var(--panel-bg); border:1px solid var(--border-color);
@@ -159,7 +169,7 @@
       <header class="header">
         <div class="brand">
           <img src="https://ignitedigital.com/wp-content/uploads/2025/07/Ignite-Digital-Logo.png" alt="Ignite Digital logo" />
-        <h1>Tech & Marketing Briefing</h1>
+          <h1>Tech & Marketing Briefing</h1>
         </div>
         <div id="clock"></div>
       </header>
@@ -228,24 +238,38 @@
 
     /* ========================== UTIL ========================== */
     function updateClock(){
-  const now = new Date();
-  
-  const options = {hour:'2-digit', minute:'2-digit'};
-  
-  const local = now.toLocaleTimeString([], options);
-  const est   = now.toLocaleTimeString([], {...options, timeZone: 'America/New_York'});
-  const cst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Chicago'});
-  const mst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Denver'});
-  const pst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Los_Angeles'});
-  
-  clockElement.innerHTML = `
-    <div><strong>Local:</strong> ${local}</div>
-    <div><strong>EST:</strong> ${est}</div>
-    <div><strong>CST:</strong> ${cst}</div>
-    <div><strong>MST:</strong> ${mst}</div>
-    <div><strong>PST:</strong> ${pst}</div>
-  `;
-}
+      const now = new Date();
+      const options = {hour:'2-digit', minute:'2-digit'};
+      const local = now.toLocaleTimeString([], options);
+
+      const zones = {
+        EST: 'America/New_York',
+        CST: 'America/Chicago',
+        MST: 'America/Denver',
+        PST: 'America/Los_Angeles'
+      };
+
+      const tzHtml = Object.entries(zones).map(([abbr, tz])=>{
+        const t = now.toLocaleTimeString([], {...options, timeZone: tz});
+        return `<div class="tz"><span class="tz-abbr">${abbr}</span> ${t}</div>`;
+      }).join('');
+
+      clockElement.innerHTML = `
+        <div class="tz"><span class="tz-abbr">Local</span> ${local}</div>
+        ${tzHtml}
+      `;
+    }
+
+    function truncateText(text, maxLength){
+      if(!text) return '';
+      const cleaned = text.replace(/<[^>]*>/g,'');
+      if(cleaned.length<=maxLength) return cleaned;
+      const cut = cleaned.substr(0, maxLength);
+      const lastSpace = cut.lastIndexOf(' ');
+      return (lastSpace>0 ? cut.substr(0,lastSpace) : cut) + '…';
+    }
+    // Ensure global availability to avoid "not defined" in any scope/bundler situation
+    window.truncateText = truncateText;
 
     function getWeatherIcon(wmoCode){
       const icons = {'0':'☀️','1':'🌤️','2':'☁️','3':'☁️','45':'🌫️','48':'🌫️','51':'🌧️','53':'🌧️','55':'🌧️','61':'🌧️','63':'🌧️','65':'🌧️','80':'🌦️','81':'🌦️','82':'🌦️','95':'⛈️','96':'⛈️','99':'⛈️'};
@@ -365,15 +389,14 @@
       return m? m[1] : '';
     }
     function extractImageUrl(item){
-        const html = item.content || item.content_html || item.description || '';
-        const candidates = [
-            item.thumbnail,
-            item.enclosure && item.enclosure.link,
-            Array.isArray(item.enclosures) && item.enclosures.length ? item.enclosures[0].link : '',
-            extractImgFromHtml(html)
-        ].filter(Boolean);
-        // Return the first valid, normalized URL, or null if none are found.
-        return candidates.map(normalizeUrl).find(Boolean) || null;
+      const html = item.content || item.content_html || item.description || '';
+      const candidates = [
+          item.thumbnail,
+          item.enclosure && item.enclosure.link,
+          Array.isArray(item.enclosures) && item.enclosures.length ? item.enclosures[0].link : '',
+          extractImgFromHtml(html)
+      ].filter(Boolean);
+      return candidates.map(normalizeUrl).find(Boolean) || null;
     }
 
     function scoreArticle(item){
@@ -392,7 +415,6 @@
 
     async function fetchNews(){
       try{
-        // Fetch each feed with its own try/catch so one failure doesn’t kill all
         const results = [];
         for(const url of feedUrls){
           try{
@@ -408,17 +430,16 @@
         if(results.length===0){
           featuredContainer.innerHTML = '';
           gridContainer.innerHTML = '';
-          newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost (see note above).</span>';
+          newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost.</span>';
           return;
         }
 
         const scored = results.map(item => ({item, score: scoreArticle(item)}))
-                                .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
+                              .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
 
         const TOP_N = 40;
         let top = scored.slice(0, TOP_N).map(s=>s.item);
 
-        // Keep a bit of general tech for variety
         const DIVERSITY_PERCENT = 0.12;
         const generalTech = results
           .filter(i => TOPIC_KEYWORDS.general.some(k => (`${i.title} ${i.description}`.toLowerCase().includes(k))))
@@ -461,97 +482,104 @@
         currentArticleIndex++;
       }, 350);
     }
-    
+
     function renderArticle(item, type) {
-        const summaryLen = type === 'featured' ? 190 : 90;
-        const srcName = (item.sourceName || "").trim();
+      const summaryLen = type === 'featured' ? 190 : 90;
 
-        const imageUrl = extractImageUrl(item);
-        let primarySrc;
+      // Local fallback in case truncateText isn't defined globally
+      const safeTruncate = (typeof window.truncateText === 'function')
+        ? window.truncateText
+        : (text, maxLength) => {
+            if (!text) return '';
+            const cleaned = String(text).replace(/<[^>]*>/g, '');
+            if (cleaned.length <= maxLength) return cleaned;
+            const cut = cleaned.slice(0, maxLength);
+            const lastSpace = cut.lastIndexOf(' ');
+            return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '…';
+          };
 
-        if (imageUrl) {
-            primarySrc = imageUrl;
-        } else {
-            // Use picsum.photos for placeholders. The 'seed' ensures the same article gets the same image.
-            const seed = encodeURIComponent(item.title || item.link); // Use title or link as a seed
-            const width = type === 'featured' ? 720 : 400;
-            const height = type === 'featured' ? 405 : 225;
-            primarySrc = `https://picsum.photos/seed/${seed}/${width}/${height}`;
-        }
+      const srcName = (item.sourceName || "").trim();
 
-        // Define a robust, multi-level fallback for the onerror event.
-        const finalFallback = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgZmlsbD0nI0YwRjJGNSAnPjwvcmVjdD48dGV4dCB4PSc1MCUnIHk9JzUwJScgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtc2l6ZT0nMjQnIGZpbGw9JyNBN0E4QUMnIHRleHQtYW5jaGyPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPkltYWdlIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==`;
-        const logoFallback = SOURCE_LOGOS[srcName] || finalFallback;
+      const imageUrl = extractImageUrl(item);
+      let primarySrc;
 
-        // 1. Try to load primarySrc (real image or Picsum placeholder).
-        // 2. On error, try to load the source's logo (logoFallback).
-        // 3. On a second error, load the final, ultra-reliable SVG fallback.
-        const img = `<img src="${primarySrc}" alt="" class="article-image" loading="lazy"
-            referrerpolicy="no-referrer"
-            onerror="this.onerror=null; this.src='${logoFallback}'; this.onerror=() => { this.src='${finalFallback}'; };">`;
+      if (imageUrl) {
+          primarySrc = imageUrl;
+      } else {
+          const seed = encodeURIComponent(item.title || item.link);
+          const width = type === 'featured' ? 720 : 400;
+          const height = type === 'featured' ? 405 : 225;
+          primarySrc = `https://picsum.photos/seed/${seed}/${width}/${height}`;
+      }
 
-        return `<div class="card ${type}-card">
-          ${img}
-          <div class="article-content">
-              <div class="article-header">
-                  <span class="source-label">${item.sourceName}</span>
-                  <span class="time-ago">${formatTimeAgo(item.pubDate)}</span>
-              </div>
-              <h2 class="article-title"><a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a></h2>
-              <p class="article-summary">${truncateText(item.description, summaryLen)}</p>
-          </div>
-        </div>`;
+      const finalFallback = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgZmlsbD0nI0YwRjJGNSAnPjwvcmVjdD48dGV4dCB4PSc1MCUnIHk9JzUwJScgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtc2l6ZT0nMjQnIGZpbGw9JyNBN0E4QUMnIHRleHQtYW5jaGyPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPkltYWdlIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==`;
+      const logoFallback = SOURCE_LOGOS[srcName] || finalFallback;
+
+      const img = `<img src="${primarySrc}" alt="" class="article-image" loading="lazy"
+          referrerpolicy="no-referrer"
+          onerror="this.onerror=null; this.src='${logoFallback}'; this.onerror=() => { this.src='${finalFallback}'; };">`;
+
+      return `<div class="card ${type}-card">
+        ${img}
+        <div class="article-content">
+            <div class="article-header">
+                <span class="source-label">${item.sourceName}</span>
+                <span class="time-ago">${formatTimeAgo(item.pubDate)}</span>
+            </div>
+            <h2 class="article-title"><a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a></h2>
+            <p class="article-summary">${safeTruncate(item.description, summaryLen)}</p>
+        </div>
+      </div>`;
     }
 
     /* ========================== QUOTE & WORD ========================== */
-	async function fetchQuote(){
-  try{
-    // Try ZenQuotes first
-    let res = await fetch('https://zenquotes.io/api/random');
-    if (!res.ok) throw new Error(`ZenQuotes ${res.status}`);
-
-    let data;
-    try { data = await res.json(); }
-    catch { throw new Error('ZenQuotes JSON parse'); }
-
-    const q = Array.isArray(data) ? data[0] : null;
-    if(!q || !q.q || !q.a) throw new Error('ZenQuotes shape');
-
-    quoteContent.innerHTML =
-      `<div class="quote-content">“${q.q}”</div><div class="quote-author">— ${q.a}</div>`;
-    return; // success
-  } catch (e1) {
-    // Attempt a CORS proxy (works when the API blocks your origin)
-    try{
-      const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://zenquotes.io/api/random')}`;
-      const res2 = await fetch(proxied);
-      if (!res2.ok) throw new Error(`Proxy ${res2.status}`);
-      const data2 = await res2.json();
-      const q2 = Array.isArray(data2) ? data2[0] : null;
-      if(q2 && q2.q && q2.a){
-        quoteContent.innerHTML =
-          `<div class="quote-content">“${q2.q}”</div><div class="quote-author">— ${q2.a}</div>`;
-        return;
-      }
-      throw new Error('Proxy shape');
-    } catch (e2) {
-      // Final fallback: Quotable (reliable CORS)
+    async function fetchQuote(){
       try{
-        const res3 = await fetch('https://api.quotable.io/random');
-        if (!res3.ok) throw new Error(`Quotable ${res3.status}`);
-        const d3 = await res3.json();
-        if(d3 && d3.content && d3.author){
-          quoteContent.innerHTML =
-            `<div class="quote-content">“${d3.content}”</div><div class="quote-author">— ${d3.author}</div>`;
-          return;
-        }
-      } catch {}
-    }
-  }
-  // If every path failed:
-  quoteContent.innerHTML = '<small style="color:var(--text-muted)">Quote unavailable.</small>';
-}
+        // Try ZenQuotes first
+        let res = await fetch('https://zenquotes.io/api/random');
+        if (!res.ok) throw new Error(`ZenQuotes ${res.status}`);
 
+        let data;
+        try { data = await res.json(); }
+        catch { throw new Error('ZenQuotes JSON parse'); }
+
+        const q = Array.isArray(data) ? data[0] : null;
+        if(!q || !q.q || !q.a) throw new Error('ZenQuotes shape');
+
+        quoteContent.innerHTML =
+          `<div class="quote-content">“${q.q}”</div><div class="quote-author">— ${q.a}</div>`;
+        return; // success
+      } catch (e1) {
+        // Attempt a CORS proxy
+        try{
+          const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://zenquotes.io/api/random')}`;
+          const res2 = await fetch(proxied);
+          if (!res2.ok) throw new Error(`Proxy ${res2.status}`);
+          const data2 = await res2.json();
+          const q2 = Array.isArray(data2) ? data2[0] : null;
+          if(q2 && q2.q && q2.a){
+            quoteContent.innerHTML =
+              `<div class="quote-content">“${q2.q}”</div><div class="quote-author">— ${q2.a}</div>`;
+            return;
+          }
+          throw new Error('Proxy shape');
+        } catch (e2) {
+          // Final fallback: Quotable (reliable CORS)
+          try{
+            const res3 = await fetch('https://api.quotable.io/random');
+            if (!res3.ok) throw new Error(`Quotable ${res3.status}`);
+            const d3 = await res3.json();
+            if(d3 && d3.content && d3.author){
+              quoteContent.innerHTML =
+                `<div class="quote-content">“${d3.content}”</div><div class="quote-author">— ${d3.author}</div>`;
+              return;
+            }
+          } catch {}
+        }
+      }
+      // If every path failed:
+      quoteContent.innerHTML = '<small style="color:var(--text-muted)">Quote unavailable.</small>';
+    }
 
     async function fetchWordOfTheDay(){
       try{
@@ -587,10 +615,7 @@
     setInterval(fetchNews, 30 * 60 * 1000); // Every 30 minutes
     setInterval(rotateArticles, 30 * 1000); // Every 30 seconds
     setInterval(fetchQuote, 10 * 60 * 1000); // Every 10 minutes
-    // FIX: Added the missing timer for the Word of the Day widget
     setInterval(fetchWordOfTheDay, 60 * 60 * 1000); // Every hour
   </script>
 </body>
-
 </html>
-
