@@ -233,6 +233,7 @@
   const options = {hour:'2-digit', minute:'2-digit'};
   
   const local = now.toLocaleTimeString([], options);
+  const est   = now.toLocaleTimeString([], {...options, timeZone: 'America/New_York'});
   const cst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Chicago'});
   const mst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Denver'});
   const pst   = now.toLocaleTimeString([], {...options, timeZone: 'America/Los_Angeles'});
@@ -245,7 +246,6 @@
     <div><strong>PST:</strong> ${pst}</div>
   `;
 }
-
 
     function getWeatherIcon(wmoCode){
       const icons = {'0':'☀️','1':'🌤️','2':'☁️','3':'☁️','45':'🌫️','48':'🌫️','51':'🌧️','53':'🌧️','55':'🌧️','61':'🌧️','63':'🌧️','65':'🌧️','80':'🌦️','81':'🌦️','82':'🌦️','95':'⛈️','96':'⛈️','99':'⛈️'};
@@ -593,3 +593,4 @@
 </body>
 
 </html>
+
