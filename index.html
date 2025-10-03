@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- IMPORTANT: allow consistent layout/scrolling across devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="referrer" content="no-referrer" />
   <title>Ignite Digital — Tech & Marketing Briefing</title>
   <style>
     :root{
@@ -25,12 +27,14 @@
     }
 
     *{box-sizing:border-box}
+    html, body{height:100%}
     body{
-      margin:0; height:100vh; overflow:hidden;
+      margin:0;
+      /* Allow page to scroll on small/quirky UAs instead of trapping it */
+      overflow:auto;
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
       color:var(--text-color); background:var(--bg-color);
-      display:flex;
-      flex-direction:column;
+      display:flex; flex-direction:column;
     }
 
     /* Error banner */
@@ -42,19 +46,24 @@
     #errbar strong{margin-right:8px}
 
     .dashboard-container{
-      display:flex;
-      flex:1;
+      display:flex; flex:1 1 auto;
+      /* Critical for nested scroll on iOS/Android/TV browsers */
+      min-height:0;
       overflow:hidden;
     }
     .sidebar{
       width:360px; background:var(--panel-bg); border-right:1px solid var(--border-color);
-      padding:22px; display:flex; flex-direction:column; gap:18px; overflow-y:auto;
+      padding:22px; display:flex; flex-direction:column; gap:18px;
+      overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0;
     }
-    .main-content{flex:1; display:flex; flex-direction:column; overflow:hidden}
+    .main-content{
+      flex:1 1 auto; display:flex; flex-direction:column; overflow:hidden; min-height:0;
+    }
 
     .header{
       display:flex; justify-content:space-between; align-items:center; gap:16px;
       background:var(--panel-bg); border-bottom:1px solid var(--border-color); padding:14px 26px;
+      flex:0 0 auto;
     }
     .brand{display:flex; align-items:center; gap:12px}
     .brand img{height:36px; width:auto; display:block}
@@ -104,10 +113,11 @@
     #quote-widget .quote-author{font-weight:700; text-align:right; color:#6B7280}
 
     /* News layout containers */
-    .news-container{flex:1; padding:22px; overflow-y:auto}
+    .news-container{
+      flex:1 1 auto; padding:22px; overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0;
+    }
     #featured-article,#grid-container{transition:opacity .35s ease}
     #featured-article{margin-bottom:22px}
-    /* grid-container hosts crossfades; the actual grid is the child wrapper we swap in */
     #grid-container{position:relative; min-height:200px;}
 
     /* Cards */
@@ -116,7 +126,7 @@
       border-radius:14px; overflow:hidden; display:flex; box-shadow:var(--shadow);
     }
     .featured-card{flex-direction:row; min-height:240px}
-    .featured-card .article-image{width:45%; object-fit:cover}
+    .featured-card .article-image{width:45%; object-fit:cover; height:auto; max-height:420px}
     .grid-card{flex-direction:column}
     .grid-card .article-image{width:100%; height:170px; object-fit:cover}
     .article-content{padding:16px; display:flex; flex-direction:column}
@@ -136,7 +146,7 @@
     @keyframes ticker{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-100%,0,0)}}
 
     /* -------- Smooth, per-block crossfades -------- */
-    .fade-host { position: relative; }
+    .fade-host { position: relative; min-height: 1px; }
     .fade-host > * { will-change: opacity, transform; }
 
     .fade-enter { opacity:0; transform: translateY(6px); }
@@ -172,6 +182,8 @@
       .widget{flex:1 1 320px}
       .featured-card{flex-direction:column}
       .featured-card .article-image{width:100%; height:200px}
+      /* ensure main stays visible above sidebar on small screens */
+      .main-content{order:1}
     }
   </style>
 </head>
@@ -321,7 +333,7 @@
       return Math.floor(seconds) + " seconds ago";
     }
 
-    /* -------- Crossfade helpers (per-block, no full-page flashing) -------- */
+    /* -------- Crossfade helpers -------- */
     function renderArticleNode(item, type) {
       const wrapper = document.createElement('div');
       wrapper.innerHTML = renderArticle(item, type).trim();
@@ -330,33 +342,15 @@
 
     function crossfadeReplace(host, nextNode) {
       const prev = host.firstElementChild;
-
-      // Prepare entering node
       nextNode.classList.add('fade-enter');
-      host.insertBefore(nextNode, prev || null); // on top
-
-      // Force reflow so transition triggers
-      // eslint-disable-next-line no-unused-expressions
-      nextNode.offsetHeight;
-
-      // Animate in
+      host.insertBefore(nextNode, prev || null);
+      void nextNode.offsetHeight;
       nextNode.classList.add('fade-enter-active');
-
-      // Animate out old (if any), then remove
       if (prev) {
-        prev.classList.add('fade-exit');
-        // eslint-disable-next-line no-unused-expressions
-        prev.offsetHeight;
-        prev.classList.add('fade-exit-active');
-        prev.addEventListener('transitionend', () => {
-          if (prev && prev.parentNode === host) prev.remove();
-        }, { once: true });
+        prev.classList.add('fade-exit'); void prev.offsetHeight; prev.classList.add('fade-exit-active');
+        prev.addEventListener('transitionend', () => { if (prev && prev.parentNode === host) prev.remove(); }, { once: true });
       }
-
-      // Cleanup classes after enter finishes
-      nextNode.addEventListener('transitionend', () => {
-        nextNode.classList.remove('fade-enter', 'fade-enter-active');
-      }, { once: true });
+      nextNode.addEventListener('transitionend', () => { nextNode.classList.remove('fade-enter', 'fade-enter-active'); }, { once: true });
     }
 
     /* ========================== WEATHER ========================== */
@@ -423,7 +417,69 @@
       }
     }
 
-    /* ========================== NEWS (scoring + images) ========================== */
+    /* ========================== NEWS (CORS-robust) ========================== */
+
+    // Helpers: normalize & parse RSS items
+    function norm(s){ return (s||'').trim(); }
+    function textContent(el, sel){ const n = el.querySelector(sel); return n ? n.textContent : ''; }
+    function getInner(el, sel){ const n = el.querySelector(sel); return n ? n.innerHTML : ''; }
+
+    async function fetchWithTimeout(url, ms=12000){
+      const ctrl = new AbortController();
+      const to = setTimeout(()=>ctrl.abort('timeout'), ms);
+      try{
+        const res = await fetch(url, {signal: ctrl.signal});
+        return res;
+      } finally { clearTimeout(to); }
+    }
+
+    async function fetchFeedDirect(url){
+      const res = await fetchWithTimeout(url);
+      if(!res.ok) throw new Error('direct fetch failed ' + res.status);
+      return await res.text();
+    }
+    async function fetchFeedAllOrigins(url){
+      const res = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+      if(!res.ok) throw new Error('allorigins failed ' + res.status);
+      return await res.text();
+    }
+    async function fetchFeedFeed2JSON(url){
+      const res = await fetchWithTimeout(`https://feed2json.org/v1?url=${encodeURIComponent(url)}`);
+      if(!res.ok) throw new Error('feed2json failed ' + res.status);
+      const data = await res.json();
+      if(!data || !data.items) throw new Error('feed2json shape');
+      // convert to a pseudo-RSS XML string we can parse uniformly
+      // (or just map to our internal item shape below)
+      return { json: data };
+    }
+
+    function parseRssXmlToItems(xmlString, sourceHint){
+      const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+      const chanTitle = textContent(doc, 'channel>title') || textContent(doc, 'feed>title') || sourceHint || '';
+      const items = [];
+      // RSS item or Atom entry
+      const nodes = doc.querySelectorAll('item, entry');
+      nodes.forEach(n=>{
+        const title = textContent(n, 'title');
+        const link  = (n.querySelector('link')?.getAttribute('href')) || textContent(n, 'link');
+        const pub   = textContent(n, 'pubDate') || textContent(n, 'updated') || textContent(n, 'published') || new Date().toISOString();
+        const desc  = getInner(n, 'description') || getInner(n, 'content') || getInner(n, 'content\\:encoded');
+        items.push({ title, link, pubDate: pub, description: desc, sourceName: chanTitle });
+      });
+      return items;
+    }
+
+    function itemsFromFeed2JSON(feedJson){
+      const chanTitle = feedJson.title || '';
+      return (feedJson.items || []).map(it=>({
+        title: it.title,
+        link: it.url || it.external_url || it.id || '',
+        pubDate: it.date_published || it.date_modified || new Date().toISOString(),
+        description: it.content_html || it.content_text || '',
+        sourceName: chanTitle
+      }));
+    }
+
     const TOPIC_WEIGHTS = { ai:3.2, aio:2.6, seo:2.9, marketing:2.2, general:0.5 };
     const TOPIC_KEYWORDS = {
       ai:[" ai ","artificial intelligence","genai"," gpt","openai"," llm","large language model","machine learning"," ml ","deep learning","rag","vector db","agents","anthropic","copilot"],
@@ -436,7 +492,6 @@
       "Search Engine Journal":1.4, "Search Engine Land":1.3, "Moz":1.3, "Ahrefs":1.3,
       "Content Marketing Institute":1.2, "VentureBeat":1.1
     };
-
     const SOURCE_LOGOS = {
       "Search Engine Journal":"https://www.searchenginejournal.com/wp-content/themes/sej-2023/assets/img/favicons/android-chrome-192x192.png",
       "Search Engine Land":"https://searchengineland.com/wp-content/uploads/2018/06/sel-favicon-192.png",
@@ -486,33 +541,79 @@
 
     async function fetchNews(){
       try{
-        const results = [];
+        const aggregated = [];
+
         for(const url of feedUrls){
           try{
-            const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
-            const feedData = await res.json();
-            if(feedData && feedData.status==='ok'){
-              const items = feedData.items.map(item => ({...item, sourceName: feedData.feed.title}));
-              results.push(...items);
+            // 1) Try direct (best; least fragile)
+            let res1Ok = false, items = [];
+            try{
+              const xml = await fetchFeedDirect(url);
+              items = parseRssXmlToItems(xml);
+              res1Ok = items.length > 0;
+            }catch{}
+
+            if(!res1Ok){
+              // 2) Try AllOrigins (liberal CORS)
+              try{
+                const xml2 = await fetchFeedAllOrigins(url);
+                items = parseRssXmlToItems(xml2);
+                res1Ok = items.length > 0;
+              }catch{}
+            }
+
+            if(!res1Ok){
+              // 3) Feed2JSON fallback
+              try{
+                const f2 = await fetchFeedFeed2JSON(url);
+                if(f2.json){
+                  items = itemsFromFeed2JSON(f2.json);
+                  res1Ok = items.length > 0;
+                }
+              }catch{}
+            }
+
+            if(res1Ok){
+              // annotate with source if missing
+              const sourceGuess = (new URL(url)).hostname.replace('www.','');
+              items.forEach(it => { if(!it.sourceName) it.sourceName = sourceGuess; });
+              aggregated.push(...items);
+            } else {
+              console.warn('All fetch methods failed for feed:', url);
             }
           }catch(fe){ console.warn('Feed failed:', url, fe); }
         }
 
-        if(results.length===0){
-          // Don't clear featured/grid to avoid flash; just update ticker
-          newsTicker.innerHTML = '<span class="ticker-item">No news fetched. If you opened this file directly, try serving it via http://localhost.</span>';
+        if(aggregated.length===0){
+          newsTicker.innerHTML = '<span class="ticker-item">No news fetched (network/CORS blocked). Try opening via http(s) or check connection.</span>';
+          // Show a friendly placeholder so the area isn’t “blank”
+          const placeholder = {
+            sourceName:'Ignite Digital',
+            pubDate:new Date().toISOString(),
+            title:'News temporarily unavailable',
+            link:'#',
+            description:'We’re having trouble fetching feeds on this device. Content will appear automatically once connectivity/CORS allows.'
+          };
+          crossfadeReplace(featuredContainer, renderArticleNode(placeholder,'featured'));
+          const gridWrapper = document.createElement('div');
+          gridWrapper.className = 'grid-swap';
+          for(let i=0;i<4;i++) gridWrapper.appendChild(renderArticleNode(placeholder,'grid'));
+          crossfadeReplace(gridContainer, gridWrapper);
           return;
         }
 
-        const scored = results.map(item => ({item, score: scoreArticle(item)}))
-                              .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
+        // Score / pick
+        const scored = aggregated.map(item => ({item, score: scoreArticle(item)}))
+                                 .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
 
         const TOP_N = 40;
         let top = scored.slice(0, TOP_N).map(s=>s.item);
 
         const DIVERSITY_PERCENT = 0.12;
-        const generalTech = results
-          .filter(i => TOPIC_KEYWORDS.general.some(k => (`${i.title} ${i.description}`.toLowerCase().includes(k))))
+        const generalTech = aggregated
+          .filter(i => ["software","product","startup","funding","apps","hardware","cloud","saas"].some(
+            k => (`${i.title} ${i.description}`.toLowerCase().includes(k))
+          ))
           .sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate))
           .slice(0, Math.ceil(TOP_N * DIVERSITY_PERCENT));
 
@@ -520,13 +621,11 @@
         for(const g of generalTech){ if(!links.has(g.link)) top.push(g); }
 
         top.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
-
         articlesPool = top.slice(0,30);
 
-        // Update ticker without flashing the page
+        // Update ticker
         newsTicker.innerHTML = `<span class="ticker-item">${articlesPool.map(i => `••• ${i.title} `).join('')}</span>`;
 
-        // Gentle swap for what's visible
         if(articlesPool.length>0){
           currentArticleIndex = 0;
           rotateArticles();
@@ -543,11 +642,11 @@
       currentArticleIndex = currentArticleIndex % articlesPool.length;
       const featured = articlesPool[currentArticleIndex];
 
-      // Featured article (crossfade single card)
+      // Featured
       const nextFeaturedNode = renderArticleNode(featured, 'featured');
       crossfadeReplace(featuredContainer, nextFeaturedNode);
 
-      // Grid articles (swap a wrapper that IS a grid, so cards stay in rows)
+      // Grid
       const gridWrapper = document.createElement('div');
       gridWrapper.className = 'grid-swap';
       for (let i = 1; i <= 4; i++){
@@ -562,7 +661,6 @@
     function renderArticle(item, type) {
       const summaryLen = type === 'featured' ? 190 : 90;
 
-      // Local fallback in case truncateText isn't defined globally
       const safeTruncate = (typeof window.truncateText === 'function')
         ? window.truncateText
         : (text, maxLength) => {
@@ -576,13 +674,14 @@
 
       const srcName = (item.sourceName || "").trim();
 
-      const imageUrl = extractImageUrl(item);
-      let primarySrc;
+      const html = item.description || '';
+      const imageUrl = extractImageUrl({ description: html, content_html: html });
 
+      let primarySrc;
       if (imageUrl) {
           primarySrc = imageUrl;
       } else {
-          const seed = encodeURIComponent(item.title || item.link);
+          const seed = encodeURIComponent(item.title || item.link || Math.random().toString(36).slice(2));
           const width = type === 'featured' ? 720 : 400;
           const height = type === 'featured' ? 405 : 225;
           primarySrc = `https://picsum.photos/seed/${seed}/${width}/${height}`;
@@ -595,15 +694,19 @@
           referrerpolicy="no-referrer"
           onerror="this.onerror=null; this.src='${logoFallback}'; this.onerror=() => { this.src='${finalFallback}'; };">`;
 
+      const title = item.title || 'Untitled';
+      const link  = item.link || '#';
+      const pub   = item.pubDate || new Date().toISOString();
+
       return `<div class="card ${type}-card">
         ${img}
         <div class="article-content">
             <div class="article-header">
-                <span class="source-label">${item.sourceName}</span>
-                <span class="time-ago">${formatTimeAgo(item.pubDate)}</span>
+                <span class="source-label">${srcName || 'Source'}</span>
+                <span class="time-ago">${formatTimeAgo(pub)}</span>
             </div>
-            <h2 class="article-title"><a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a></h2>
-            <p class="article-summary">${safeTruncate(item.description, summaryLen)}</p>
+            <h2 class="article-title"><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h2>
+            <p class="article-summary">${safeTruncate(html, summaryLen)}</p>
         </div>
       </div>`;
     }
@@ -611,22 +714,14 @@
     /* ========================== QUOTE & WORD ========================== */
     async function fetchQuote(){
       try{
-        // Try ZenQuotes first
         let res = await fetch('https://zenquotes.io/api/random');
         if (!res.ok) throw new Error(`ZenQuotes ${res.status}`);
-
-        let data;
-        try { data = await res.json(); }
-        catch { throw new Error('ZenQuotes JSON parse'); }
-
+        let data = await res.json();
         const q = Array.isArray(data) ? data[0] : null;
         if(!q || !q.q || !q.a) throw new Error('ZenQuotes shape');
-
         quoteContent.innerHTML =
           `<div class="quote-content">“${q.q}”</div><div class="quote-author">— ${q.a}</div>`;
-        return; // success
       } catch (e1) {
-        // Attempt a CORS proxy
         try{
           const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://zenquotes.io/api/random')}`;
           const res2 = await fetch(proxied);
@@ -640,7 +735,6 @@
           }
           throw new Error('Proxy shape');
         } catch (e2) {
-          // Final fallback: Quotable
           try{
             const res3 = await fetch('https://api.quotable.io/random');
             if (!res3.ok) throw new Error(`Quotable ${res3.status}`);
@@ -651,10 +745,9 @@
               return;
             }
           } catch {}
+          quoteContent.innerHTML = '<small style="color:var(--text-muted)">Quote unavailable.</small>';
         }
       }
-      // If every path failed:
-      quoteContent.innerHTML = '<small style="color:var(--text-muted)">Quote unavailable.</small>';
     }
 
     async function fetchWordOfTheDay(){
@@ -685,13 +778,13 @@
     fetchQuote();
     fetchWordOfTheDay();
 
-    setInterval(updateClock, 1000); // Every second
-    setInterval(fetchWeather, 60 * 60 * 1000); // Every hour
-    setInterval(fetchStocks, 10 * 60 * 1000); // Every 10 minutes
-    setInterval(fetchNews, 30 * 60 * 1000); // Every 30 minutes
-    setInterval(rotateArticles, 30 * 1000); // Every 30 seconds
-    setInterval(fetchQuote, 10 * 60 * 1000); // Every 10 minutes
-    setInterval(fetchWordOfTheDay, 60 * 60 * 1000); // Every hour
+    setInterval(updateClock, 1000); // clock
+    setInterval(fetchWeather, 60 * 60 * 1000); // hourly
+    setInterval(fetchStocks, 10 * 60 * 1000); // 10 min
+    setInterval(fetchNews, 30 * 60 * 1000);   // 30 min refresh
+    setInterval(rotateArticles, 30 * 1000);   // rotate display
+    setInterval(fetchQuote, 10 * 60 * 1000);
+    setInterval(fetchWordOfTheDay, 60 * 60 * 1000);
   </script>
 </body>
 </html>
