@@ -20,16 +20,12 @@
       --text-muted:#6B7280;
       --accent:var(--brand-orange);
       --shadow:0 8px 24px rgba(16,24,40,0.08);
-
-      --price-up:#157347;
-      --price-down:#C02B2B;
     }
 
     *{box-sizing:border-box}
     html, body{height:100%}
     body{
       margin:0;
-      /* Allow page to scroll on small/quirky UAs instead of trapping it */
       overflow:auto;
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
       color:var(--text-color); background:var(--bg-color);
@@ -46,7 +42,6 @@
 
     .dashboard-container{
       display:flex; flex:1 1 auto;
-      /* Critical for nested scroll on iOS/Android/TV browsers */
       min-height:0;
       overflow:hidden;
     }
@@ -70,13 +65,13 @@
 
     /* Clocks */
     #clock{
-      display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end;
+      display:flex; flex-wrap:wrap; gap:14px; justify-content:flex-end;
       font-weight:700; color:#334155
     }
     #clock .tz{
-      display:flex; align-items:center; gap:6px;
+      display:flex; align-items:center; gap:8px;
       background:var(--panel-subtle); border:1px solid var(--border-color);
-      padding:6px 10px; border-radius:12px; font-size:.9rem;
+      padding:8px 14px; border-radius:12px; font-size:1.4rem;
     }
     #clock .tz .tz-abbr{font-weight:800; color:#111827}
 
@@ -94,24 +89,6 @@
     #weather-widget .temp-main{font-size:3rem; font-weight:800; text-align:center}
     #weather-widget .weather-desc{font-size:1.1rem; text-align:center; margin:-4px 0 8px 0}
     #weather-widget .temp-range{font-size:.95rem; text-align:center; color:var(--text-muted)}
-
-    /* --- ADDED FOR TRAFFIC WIDGET --- */
-    #traffic-widget iframe {
-        width: 100%;
-        height: 350px;
-        border: none;
-        border-radius: 6px;
-    }
-    /* ---------------------------------- */
-
-    /* Stocks */
-    #stock-ticker .stock-item{
-      display:flex; justify-content:space-between; align-items:center;
-      margin-bottom:10px; padding:8px 10px; border-radius:10px;
-      background:var(--panel-subtle); border:1px solid var(--border-color);
-    }
-    #stock-ticker .stock-symbol{font-weight:800}
-    .price-up{color:var(--price-up)} .price-down{color:var(--price-down)}
 
     /* Word & Quote */
     #word-widget .word{font-size:1.2rem; font-weight:800; color:var(--accent)}
@@ -183,8 +160,6 @@
         transform: none !important;
       }
     }
-
-   
   </style>
 </head>
 <body>
@@ -197,9 +172,11 @@
         <div id="weather-content"></div>
       </div>
 
-      <div id="traffic-widget" class="widget">
+      <div id="commute-widget" class="widget">
         <h3 class="widget-title">Live Commute</h3>
-        <iframe src="https://www.google.com/maps/embed?pb=!1m28!1m12!1m3!1d184630.26155391257!2d-79.73384537721364!3d43.69292671836781!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!4m13!3e6!4m5!1s0x882b473cafcd38d5%3A0xbf9304ca311f3e2!2sIgnite%20Digital%2C%20Kitimat%20Road%2C%20Mississauga%2C%20ON!3m2!1d43.6029195!2d-79.7332782!4m5!1s0x89d4cb90d7c63ba5%3A0x323555502ab4c477!2sToronto%2C%20ON!3m2!1d43.653226!2d-79.3831843!5e0!3m2!1sen!2sca!4v1759954013314!5m2!1sen!2sca" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div id="travel-time-text" style="font-size: 1.5rem; text-align: center; font-weight: bold;">
+          Loading...
+        </div>
       </div>
       <div id="quote-widget" class="widget">
         <h3 class="widget-title">Quote</h3>
@@ -208,10 +185,6 @@
       <div id="word-widget" class="widget">
         <h3 class="widget-title">Word of the Day</h3>
         <div id="word-content"></div>
-      </div>
-      <div id="stock-ticker" class="widget">
-        <h3 class="widget-title">Tech Market</h3>
-        <div id="stock-content"></div>
       </div>
     </aside>
 
@@ -251,10 +224,6 @@
     })();
 
     /* ========================== CONFIG ========================== */
-    const twelveDataApiKey = 'b261e31044ad48e387824a23d233e05a';
-    const stockSymbols = ['AAPL','MSFT','GOOGL','NVDA'];
-
-    // AI / AIO / SEO / Marketing first, a touch of general tech
     const feedUrls = [
       "https://venturebeat.com/category/ai/feed/",
       "https://www.marktechpost.com/feed/",
@@ -279,7 +248,6 @@
 
     const clockElement      = document.getElementById('clock');
     const weatherContent    = document.getElementById('weather-content');
-    const stockContent      = document.getElementById('stock-content');
     const featuredContainer = document.getElementById('featured-article');
     const gridContainer     = document.getElementById('grid-container');
     const newsTicker        = document.getElementById('news-ticker');
@@ -318,7 +286,6 @@
       const lastSpace = cut.lastIndexOf(' ');
       return (lastSpace>0 ? cut.substr(0,lastSpace) : cut) + '…';
     }
-    // Ensure global availability
     window.truncateText = truncateText;
 
     function getWeatherIcon(wmoCode){
@@ -358,7 +325,8 @@
       nextNode.addEventListener('transitionend', () => { nextNode.classList.remove('fade-enter', 'fade-enter-active'); }, { once: true });
     }
 
-    /* ========================== WEATHER ========================== */
+    /* ========================== DATA FETCHING FUNCTIONS ========================== */
+
     async function fetchWeather(){
       try{
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);
@@ -367,181 +335,36 @@
         weatherContent.innerHTML = `
           <div class="temp-main">${Math.round(data.current.temperature_2m)}°</div>
           <div class="weather-desc">${getWeatherIcon(String(data.current.weather_code))}</div>
-          <div class="temp-range">H: ${Math.round(data.daily.temperature_2m_max[0])}° &nbsp; L: ${Math.round(data.daily.temperature_2m_min[0])}°</div>
+          <div class="temp-range">H: ${Math.round(data.daily.temperature_2m_max[0])}°   L: ${Math.round(data.daily.temperature_2m_min[0])}°</div>
         `;
       }catch(e){
         console.error("Weather error:", e);
         weatherContent.innerHTML = `<small style="color:var(--text-muted)">Weather unavailable.</small>`;
       }
     }
+    
+    function fetchTomTomTravelTime() {
+      const apiKey = 'YOUR_TOMTOM_API_KEY'; // <-- PASTE YOUR KEY HERE
+      const outputDiv = document.getElementById('travel-time-text');
+      
+      const locations = '-79.7450,43.5952:-79.3813,43.6454';
+      
+      const apiUrl = `https://api.tomtom.com/routing/1/calculateRoute/${locations}/json?traffic=true&travelMode=car&key=${apiKey}`;
 
-    /* ========================== STOCKS ========================== */
-    async function fetchStocks(){
-      if(!twelveDataApiKey || twelveDataApiKey === 'YOUR_TWELVE_DATA_API_KEY'){
-        stockContent.innerHTML = '<small style="color:var(--text-muted)">Add Twelve Data API Key</small>';
-        return;
-      }
-      try{
-        const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(stockSymbols.join(','))}&apikey=${encodeURIComponent(twelveDataApiKey)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        const results = Array.isArray(data) ? data
-          : (typeof data === 'object' && data && !('symbol' in data)) ? Object.values(data)
-          : [data];
-
-        const ok = results.filter(s => s && !s.code && s.symbol);
-        if(ok.length===0){
-          const firstErr = results.find(s => s && s.code) || data;
-          const msg = (firstErr && (firstErr.message || firstErr.status)) || 'Stock data unavailable.';
-          throw new Error(msg);
-        }
-
-        stockContent.innerHTML = ok.map(stock=>{
-          const price = parseFloat(stock.close);
-          const change = parseFloat(stock.change);
-          const pct    = parseFloat(stock.percent_change);
-          const isUp = !isNaN(change) ? change>=0 : true;
-          const sign = isUp ? '+' : '';
-          return `
-            <div class="stock-item">
-              <div>
-                <div class="stock-symbol">${stock.symbol}</div>
-                <div class="stock-price">${isNaN(price)?'—':price.toFixed(2)}</div>
-              </div>
-              <div class="stock-change ${isUp?'price-up':'price-down'}">
-                <div>${isNaN(change)?'—':sign+change.toFixed(2)}</div>
-                <div>(${isNaN(pct)?'—':sign+pct.toFixed(2)}%)</div>
-              </div>
-            </div>
-          `;
-        }).join('');
-      }catch(e){
-        console.error("Stocks error:", e);
-        stockContent.innerHTML = `<small>${e.message || 'Stock data unavailable.'}</small>`;
-      }
-    }
-
-    /* ========================== NEWS (CORS-robust) ========================== */
-
-    // Helpers: normalize & parse RSS items
-    function norm(s){ return (s||'').trim(); }
-    function textContent(el, sel){ const n = el.querySelector(sel); return n ? n.textContent : ''; }
-    function getInner(el, sel){ const n = el.querySelector(sel); return n ? n.innerHTML : ''; }
-
-    async function fetchWithTimeout(url, ms=12000){
-      const ctrl = new AbortController();
-      const to = setTimeout(()=>ctrl.abort('timeout'), ms);
-      try{
-        const res = await fetch(url, {signal: ctrl.signal});
-        return res;
-      } finally { clearTimeout(to); }
-    }
-
-    async function fetchFeedDirect(url){
-      const res = await fetchWithTimeout(url);
-      if(!res.ok) throw new Error('direct fetch failed ' + res.status);
-      return await res.text();
-    }
-    async function fetchFeedAllOrigins(url){
-      const res = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-      if(!res.ok) throw new Error('allorigins failed ' + res.status);
-      return await res.text();
-    }
-    async function fetchFeedFeed2JSON(url){
-      const res = await fetchWithTimeout(`https://feed2json.org/v1?url=${encodeURIComponent(url)}`);
-      if(!res.ok) throw new Error('feed2json failed ' + res.status);
-      const data = await res.json();
-      if(!data || !data.items) throw new Error('feed2json shape');
-      // convert to a pseudo-RSS XML string we can parse uniformly
-      // (or just map to our internal item shape below)
-      return { json: data };
-    }
-
-    function parseRssXmlToItems(xmlString, sourceHint){
-      const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
-      const chanTitle = textContent(doc, 'channel>title') || textContent(doc, 'feed>title') || sourceHint || '';
-      const items = [];
-      // RSS item or Atom entry
-      const nodes = doc.querySelectorAll('item, entry');
-      nodes.forEach(n=>{
-        const title = textContent(n, 'title');
-        const link  = (n.querySelector('link')?.getAttribute('href')) || textContent(n, 'link');
-        const pub   = textContent(n, 'pubDate') || textContent(n, 'updated') || textContent(n, 'published') || new Date().toISOString();
-        const desc  = getInner(n, 'description') || getInner(n, 'content') || getInner(n, 'content\\:encoded');
-        items.push({ title, link, pubDate: pub, description: desc, sourceName: chanTitle });
-      });
-      return items;
-    }
-
-    function itemsFromFeed2JSON(feedJson){
-      const chanTitle = feedJson.title || '';
-      return (feedJson.items || []).map(it=>({
-        title: it.title,
-        link: it.url || it.external_url || it.id || '',
-        pubDate: it.date_published || it.date_modified || new Date().toISOString(),
-        description: it.content_html || it.content_text || '',
-        sourceName: chanTitle
-      }));
-    }
-
-    const TOPIC_WEIGHTS = { ai:3.2, aio:2.6, seo:2.9, marketing:2.2, general:0.5 };
-    const TOPIC_KEYWORDS = {
-      ai:[" ai ","artificial intelligence","genai"," gpt","openai"," llm","large language model","machine learning"," ml ","deep learning","rag","vector db","agents","anthropic","copilot"],
-      aio:[" aio ","ai operations"," ai ops","marketing automation","workflow automation","prompt ops","content automation","auto-generate","auto generate"],
-      seo:[" seo ","search engine","serp","rankings","core update","algorithm update","link building","technical seo","schema","structured data","crawl","indexing","site reputation","eeat","helpful content"],
-      marketing:[" marketing ","growth","demand gen","content marketing","social media","campaign","email marketing","ppc","sem","paid search","google ads","facebook ads","tiktok ads","attribution","conversion rate"," cvr "," cac "," roas "],
-      general:["software","product","startup","funding","apps","hardware","cloud","saas"]
-    };
-    const SOURCE_BOOSTS = {
-      "Search Engine Journal":1.4, "Search Engine Land":1.3, "Moz":1.3, "Ahrefs":1.3,
-      "Content Marketing Institute":1.2, "VentureBeat":1.1
-    };
-    const SOURCE_LOGOS = {
-      "Search Engine Journal":"https://www.searchenginejournal.com/wp-content/themes/sej-2023/assets/img/favicons/android-chrome-192x192.png",
-      "Search Engine Land":"https://searchengineland.com/wp-content/uploads/2018/06/sel-favicon-192.png",
-      "Moz":"https://moz.com/images/favicon-196x196.png",
-      "Ahrefs":"https://ahrefs.com/favicon-196x196.png",
-      "Content Marketing Institute":"https://contentmarketinginstitute.com/wp-content/uploads/2017/05/cmi-favicon-192x192.png",
-      "VentureBeat":"https://venturebeat.com/wp-content/uploads/2019/03/cropped-vb-favicon-192x192.png",
-      "TechCrunch":"https://techcrunch.com/wp-content/uploads/2018/01/cropped-cropped-favicon-gradient-192x192.png",
-      "The Verge":"https://www.theverge.com/icons/android-chrome-192x192.png"
-    };
-
-    function normalizeUrl(u){
-      if(!u) return '';
-      if(u.startsWith('//')) return 'https:' + u;
-      if(u.startsWith('http://')) return u.replace(/^http:\/\//i,'https://');
-      return u;
-    }
-    function extractImgFromHtml(html){
-      if(!html) return '';
-      const m=html.match(/<img[^>]+src=["']([^"']+)["']/i);
-      return m? m[1] : '';
-    }
-    function extractImageUrl(item){
-      const html = item.content || item.content_html || item.description || '';
-      const candidates = [
-          item.thumbnail,
-          item.enclosure && item.enclosure.link,
-          Array.isArray(item.enclosures) && item.enclosures.length ? item.enclosures[0].link : '',
-          extractImgFromHtml(html)
-      ].filter(Boolean);
-      return candidates.map(normalizeUrl).find(Boolean) || null;
-    }
-
-    function scoreArticle(item){
-      const hay = ` ${(item.title||"")} ${(item.description||"")} `.toLowerCase();
-      let score = 0;
-      for(const [topic, words] of Object.entries(TOPIC_KEYWORDS)){
-        const w = TOPIC_WEIGHTS[topic]||1;
-        for(const k of words){ if(hay.includes(k.toLowerCase())) score += w; }
-      }
-      const ageHrs = Math.max(1, (Date.now()-new Date(item.pubDate).getTime())/36e5);
-      score += Math.max(0, 4 - Math.log(ageHrs)); // recency
-      const src = (item.sourceName||"").trim();
-      if(SOURCE_BOOSTS[src]) score *= SOURCE_BOOSTS[src];
-      return score;
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          if (!data || !data.routes || data.routes.length === 0) {
+            throw new Error('Invalid API response from TomTom');
+          }
+          const durationInSeconds = data.routes[0].summary.travelTimeInSeconds;
+          const durationInMinutes = Math.round(durationInSeconds / 60);
+          outputDiv.innerHTML = `To Union Station: <span style="color: #EF7F2B;">${durationInMinutes} mins</span>`;
+        })
+        .catch(error => {
+          outputDiv.innerText = 'Travel time unavailable.';
+          console.error('Error fetching TomTom data:', error);
+        });
     }
 
     async function fetchNews(){
@@ -550,7 +373,6 @@
 
         for(const url of feedUrls){
           try{
-            // 1) Try direct (best; least fragile)
             let res1Ok = false, items = [];
             try{
               const xml = await fetchFeedDirect(url);
@@ -559,7 +381,6 @@
             }catch{}
 
             if(!res1Ok){
-              // 2) Try AllOrigins (liberal CORS)
               try{
                 const xml2 = await fetchFeedAllOrigins(url);
                 items = parseRssXmlToItems(xml2);
@@ -568,7 +389,6 @@
             }
 
             if(!res1Ok){
-              // 3) Feed2JSON fallback
               try{
                 const f2 = await fetchFeedFeed2JSON(url);
                 if(f2.json){
@@ -579,7 +399,6 @@
             }
 
             if(res1Ok){
-              // annotate with source if missing
               const sourceGuess = (new URL(url)).hostname.replace('www.','');
               items.forEach(it => { if(!it.sourceName) it.sourceName = sourceGuess; });
               aggregated.push(...items);
@@ -590,14 +409,10 @@
         }
 
         if(aggregated.length===0){
-          newsTicker.innerHTML = '<span class="ticker-item">No news fetched (network/CORS blocked). Try opening via http(s) or check connection.</span>';
-          // Show a friendly placeholder so the area isn’t “blank”
+          newsTicker.innerHTML = '<span class="ticker-item">No news fetched (network/CORS blocked).</span>';
           const placeholder = {
-            sourceName:'Ignite Digital',
-            pubDate:new Date().toISOString(),
-            title:'News temporarily unavailable',
-            link:'#',
-            description:'We’re having trouble fetching feeds on this device. Content will appear automatically once connectivity/CORS allows.'
+            sourceName:'Ignite Digital', pubDate:new Date().toISOString(), title:'News temporarily unavailable', link:'#',
+            description:'We’re having trouble fetching news feeds. Content will appear here once available.'
           };
           crossfadeReplace(featuredContainer, renderArticleNode(placeholder,'featured'));
           const gridWrapper = document.createElement('div');
@@ -607,7 +422,6 @@
           return;
         }
 
-        // Score / pick
         const scored = aggregated.map(item => ({item, score: scoreArticle(item)}))
                                  .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
 
@@ -628,7 +442,6 @@
         top.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
         articlesPool = top.slice(0,30);
 
-        // Update ticker
         newsTicker.innerHTML = `<span class="ticker-item">${articlesPool.map(i => `••• ${i.title} `).join('')}</span>`;
 
         if(articlesPool.length>0){
@@ -643,15 +456,10 @@
 
     function rotateArticles(){
       if (articlesPool.length === 0) return;
-
       currentArticleIndex = currentArticleIndex % articlesPool.length;
       const featured = articlesPool[currentArticleIndex];
-
-      // Featured
       const nextFeaturedNode = renderArticleNode(featured, 'featured');
       crossfadeReplace(featuredContainer, nextFeaturedNode);
-
-      // Grid
       const gridWrapper = document.createElement('div');
       gridWrapper.className = 'grid-swap';
       for (let i = 1; i <= 4; i++){
@@ -659,13 +467,11 @@
         gridWrapper.appendChild(renderArticleNode(articlesPool[idx], 'grid'));
       }
       crossfadeReplace(gridContainer, gridWrapper);
-
       currentArticleIndex++;
     }
 
     function renderArticle(item, type) {
       const summaryLen = type === 'featured' ? 190 : 90;
-
       const safeTruncate = (typeof window.truncateText === 'function')
         ? window.truncateText
         : (text, maxLength) => {
@@ -678,10 +484,8 @@
           };
 
       const srcName = (item.sourceName || "").trim();
-
       const html = item.description || '';
       const imageUrl = extractImageUrl({ description: html, content_html: html });
-
       let primarySrc;
       if (imageUrl) {
           primarySrc = imageUrl;
@@ -694,7 +498,6 @@
 
       const finalFallback = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCB3aWR0aD0nODAwJyBoZWlnaHQ9JzYwMCcgZmlsbD0nI0YwRjJGNSAnPjwvcmVjdD48dGV4dCB4PSc1MCUnIHk9JzUwJScgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtc2l6ZT0nMjQnIGZpbGw9JyNBN0E4QUMnIHRleHQtYW5jaGyPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPkltYWdlIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==`;
       const logoFallback = SOURCE_LOGOS[srcName] || finalFallback;
-
       const img = `<img src="${primarySrc}" alt="" class="article-image" loading="lazy"
           referrerpolicy="no-referrer"
           onerror="this.onerror=null; this.src='${logoFallback}'; this.onerror=() => { this.src='${finalFallback}'; };">`;
@@ -778,20 +581,18 @@
     /* ========================== INIT & TIMERS ========================== */
     updateClock();
     fetchWeather();
-    fetchStocks();
+    fetchTomTomTravelTime();
     fetchNews();
     fetchQuote();
     fetchWordOfTheDay();
 
     setInterval(updateClock, 1000); // clock
     setInterval(fetchWeather, 60 * 60 * 1000); // hourly
-    setInterval(fetchStocks, 10 * 60 * 1000); // 10 min
-    setInterval(fetchNews, 30 * 60 * 1000);   // 30 min refresh
-    setInterval(rotateArticles, 30 * 1000);   // rotate display
+    setInterval(fetchTomTomTravelTime, 300000); // 5 min
+    setInterval(fetchNews, 30 * 60 * 1000);      // 30 min refresh
+    setInterval(rotateArticles, 30 * 1000);      // rotate display
     setInterval(fetchQuote, 10 * 60 * 1000);
     setInterval(fetchWordOfTheDay, 60 * 60 * 1000);
   </script>
 </body>
 </html>
-
-
