@@ -70,22 +70,40 @@
     .brand img{height:44px; width:auto; display:block}
     .brand h1{margin:0; font-size:2rem; font-weight:900; color:#111827; letter-spacing:.2px}
 
-    /* Timezones bar (HUGE, centered; target ~weather card height) */
-    #timezones{
-      display:flex; flex-wrap:wrap; gap:16px; justify-content:center;
-      font-weight:900; color:#334155; padding:22px 18px;
-      background:var(--panel-bg); border-bottom:1px solid var(--border-color);
-      min-height:150px; /* creates a tall band akin to the weather card */
-    }
-    #timezones .tz{
-      display:flex; align-items:center; gap:12px;
-      background:var(--panel-subtle); border:1px solid var(--border-color);
-      padding:16px 22px; border-radius:18px;
-      font-size:3.25rem; /* BIG — roughly matches weather card's visual weight */
-      line-height:1.1;
-      box-shadow:var(--shadow);
-    }
-    #timezones .tz .tz-abbr{font-weight:900; color:#111827}
+ /* TIMEZONES — responsive grid that grows to fit rows */
+#timezones{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* wrap into as many columns as fit */
+  gap: 18px;                       /* both row & column gap */
+  justify-items: center;           /* center each pill horizontally */
+  align-items: center;             /* center content inside a grid cell */
+  padding: 24px 18px;              /* big band like the weather card */
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  /* removed min-height to let content dictate height */
+}
+
+#timezones .tz{
+  /* big, but scales down on smaller screens */
+  font-size: clamp(1.4rem, 4.2vw, 3.6rem);
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;                     /* pill stretches to grid cell */
+  max-width: 560px;                /* don’t get comically wide on 4k */
+  padding: clamp(12px, 1.8vw, 26px) clamp(18px, 2.6vw, 34px);
+  border-radius: 22px;
+  background: var(--panel-subtle);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+#timezones .tz .tz-abbr{
+  font-weight: 900;
+  color: #111827;
+}
 
     .widget{
       background:var(--panel-bg); border:1px solid var(--border-color);
@@ -264,7 +282,6 @@
       const local = now.toLocaleTimeString([], options);
 
       const zones = {
-        Local: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local',
         EST: 'America/New_York',
         CST: 'America/Chicago',
         MST: 'America/Denver',
