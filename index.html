@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer" />
   <title>Ignite Digital — Tech & Marketing Briefing</title>
+
+  <!-- Raleway font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
   <style>
     :root{
       --brand-orange:#EF7F2B;
@@ -27,7 +33,7 @@
     body{
       margin:0;
       overflow:auto;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      font-family:"Raleway",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
       color:var(--text-color); background:var(--bg-color);
       display:flex; flex-direction:column;
     }
@@ -62,18 +68,22 @@
     }
     .brand{display:flex; align-items:center; gap:12px; justify-content:center}
     .brand img{height:44px; width:auto; display:block}
-    .brand h1{margin:0; font-size:1.9rem; font-weight:900; color:#111827; letter-spacing:.2px}
+    .brand h1{margin:0; font-size:2rem; font-weight:900; color:#111827; letter-spacing:.2px}
 
-    /* Timezones just below header, centered & slightly larger than header */
+    /* Timezones bar (HUGE, centered; target ~weather card height) */
     #timezones{
-      display:flex; flex-wrap:wrap; gap:14px; justify-content:center;
-      font-weight:800; color:#334155; padding:10px 18px;
+      display:flex; flex-wrap:wrap; gap:16px; justify-content:center;
+      font-weight:900; color:#334155; padding:22px 18px;
       background:var(--panel-bg); border-bottom:1px solid var(--border-color);
+      min-height:150px; /* creates a tall band akin to the weather card */
     }
     #timezones .tz{
-      display:flex; align-items:center; gap:10px;
+      display:flex; align-items:center; gap:12px;
       background:var(--panel-subtle); border:1px solid var(--border-color);
-      padding:10px 16px; border-radius:14px; font-size:2.05rem; /* slightly larger than header */
+      padding:16px 22px; border-radius:18px;
+      font-size:3.25rem; /* BIG — roughly matches weather card's visual weight */
+      line-height:1.1;
+      box-shadow:var(--shadow);
     }
     #timezones .tz .tz-abbr{font-weight:900; color:#111827}
 
@@ -187,7 +197,7 @@
         </div>
       </header>
 
-      <!-- Timezones bar (centered, slightly larger than header) -->
+      <!-- Timezones bar (centered, very large) -->
       <div id="timezones"></div>
 
       <div class="news-container">
@@ -338,12 +348,13 @@
     // Origin (Mississauga) — ensure LAT,LON order when building paths
     const ORIGIN = { lat: 43.5952, lon: -79.7450 };
 
-    // Destinations to geocode once, then reuse (4 total)
+    // Destinations to geocode once, then reuse (5 total)
     const DESTINATIONS = [
-      { label: 'Union Station (Toronto)',          query: 'Union Station, Toronto ON' },
-      { label: 'Shoppers World (Brampton)',        query: 'Shoppers World, Brampton ON' },
-      { label: 'Square One (Mississauga)',         query: 'Square One, Mississauga ON' },
-      { label: 'Churchill Meadows (Mississauga)',  query: 'Churchill Meadows, Mississauga ON' }
+      { label: 'Union Station (Toronto)',             query: 'Union Station, Toronto ON' },
+      { label: 'Shoppers World (Brampton)',           query: 'Shoppers World, Brampton ON' },
+      { label: 'Square One (Mississauga)',            query: 'Square One, Mississauga ON' },
+      { label: 'Churchill Meadows (Mississauga)',     query: 'Churchill Meadows, Mississauga ON' },
+      { label: 'Mattamy National Cycling Centre',     query: 'Mattamy National Cycling Centre, Milton ON' }
     ];
 
     const GEO_CACHE = new Map();
@@ -422,50 +433,125 @@
       }
     }
 
-    /* ========================== NEWS / QUOTES / WORD ========================== */
+    /* ========================== NEWS (FIXED) ========================== */
+
+    // Minimal logo fallback (optional; map host -> logo URL if you want)
+    const SOURCE_LOGOS = {};
+
+    // Try direct fetch first; then AllOrigins (CORS-friendly proxy)
+    async function fetchFeedDirect(url){
+      const res = await fetch(url, { headers: { 'Accept': 'application/rss+xml, application/xml, text/xml, text/plain' }});
+      if(!res.ok) throw new Error(`RSS ${res.status}`);
+      return await res.text();
+    }
+    async function fetchFeedAllOrigins(url){
+      const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxied);
+      if(!res.ok) throw new Error(`AllOrigins ${res.status}`);
+      return await res.text();
+    }
+
+    // Parse RSS/Atom XML into uniform item objects
+    function parseRssXmlToItems(xmlText){
+      const items = [];
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "text/xml");
+      // RSS
+      const rssItems = Array.from(doc.querySelectorAll("item"));
+      rssItems.forEach(n=>{
+        const title = n.querySelector("title")?.textContent?.trim() || "";
+        const link  = n.querySelector("link")?.textContent?.trim() || "";
+        const desc  = n.querySelector("description")?.textContent || n.querySelector("content\\:encoded")?.textContent || "";
+        const pub   = n.querySelector("pubDate")?.textContent || n.querySelector("dc\\:date")?.textContent || "";
+        const sourceName = doc.querySelector("channel>title")?.textContent?.trim() || "";
+        const content_html = desc;
+        items.push({ title, link, description: desc, content_html, pubDate: pub, sourceName });
+      });
+      // Atom
+      const atomEntries = Array.from(doc.querySelectorAll("entry"));
+      atomEntries.forEach(n=>{
+        const title = n.querySelector("title")?.textContent?.trim() || "";
+        const linkEl= n.querySelector("link[rel='alternate']") || n.querySelector("link");
+        const link  = linkEl?.getAttribute("href") || "";
+        const desc  = n.querySelector("summary")?.textContent || n.querySelector("content")?.textContent || "";
+        const pub   = n.querySelector("updated")?.textContent || n.querySelector("published")?.textContent || "";
+        const sourceName = doc.querySelector("feed>title")?.textContent?.trim() || "";
+        const content_html = desc;
+        items.push({ title, link, description: desc, content_html, pubDate: pub, sourceName });
+      });
+      return items;
+    }
+
+    // Pull first reasonable image from description/content
+    function extractImageUrl(itemLike){
+      const html = (itemLike.description || itemLike.content_html || "");
+      if(!html) return null;
+      // img src=
+      const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if(m) return m[1];
+      // figure or source
+      const m2 = html.match(/<source[^>]+srcset=["']([^"']+)["']/i);
+      if(m2) return m2[1];
+      // plain URL
+      const m3 = html.match(/https?:\/\/[^\s"']+\.(png|jpg|jpeg|gif|webp)/i);
+      if(m3) return m3[0];
+      return null;
+    }
+
+    // Simple scoring: recency + AI/marketing keyword bumps
+    function scoreArticle(it){
+      const now = Date.now();
+      const t = Date.parse(it.pubDate || "") || now;
+      const hoursOld = Math.max(1, (now - t) / 36e5);
+      let score = 1000 / hoursOld; // fresh is good
+      const text = `${it.title} ${it.description}`.toLowerCase();
+      const boosts = [
+        ["ai", 10], ["artificial intelligence", 10], ["openai", 12], ["google", 6],
+        ["meta", 6], ["apple", 6], ["microsoft", 6], ["seo", 8], ["sem", 6],
+        ["search", 5], ["content", 4], ["social", 4], ["ads", 3], ["marketing", 8],
+        ["startup", 3], ["saas", 3], ["cloud", 3]
+      ];
+      for(const [kw, b] of boosts){ if(text.includes(kw)) score += b; }
+      return score;
+    }
+
     async function fetchNews(){
       try{
         const aggregated = [];
 
         for(const url of feedUrls){
           try{
-            let res1Ok = false, items = [];
+            // try direct
+            let items = [];
             try{
               const xml = await fetchFeedDirect(url);
               items = parseRssXmlToItems(xml);
-              res1Ok = items.length > 0;
             }catch{}
 
-            if(!res1Ok){
+            // fallback: AllOrigins proxy
+            if(items.length === 0){
               try{
                 const xml2 = await fetchFeedAllOrigins(url);
                 items = parseRssXmlToItems(xml2);
-                res1Ok = items.length > 0;
               }catch{}
             }
 
-            if(!res1Ok){
-              try{
-                const f2 = await fetchFeedFeed2JSON(url);
-                if(f2.json){
-                  items = itemsFromFeed2JSON(f2.json);
-                  res1Ok = items.length > 0;
-                }
-              }catch{}
-            }
-
-            if(res1Ok){
-              const sourceGuess = (new URL(url)).hostname.replace('www.','');
-              items.forEach(it => { if(!it.sourceName) it.sourceName = sourceGuess; });
+            if(items.length > 0){
+              const host = (new URL(url)).hostname.replace('www.','');
+              items.forEach(it => {
+                if(!it.sourceName) it.sourceName = host;
+                // normalize date
+                if(!it.pubDate){ it.pubDate = new Date().toISOString(); }
+              });
               aggregated.push(...items);
             } else {
-              console.warn('All fetch methods failed for feed:', url);
+              console.warn('Feed failed:', url);
             }
-          }catch(fe){ console.warn('Feed failed:', url, fe); }
+          }catch(fe){ console.warn('Feed error:', url, fe); }
         }
 
         if(aggregated.length===0){
-          newsTicker.innerHTML = '<span class="ticker-item">No news fetched (network/CORS blocked).</span>';
+          newsTicker.innerHTML = '<span class="ticker-item">No news fetched (blocked by CORS or network). Check console for details.</span>';
           const placeholder = {
             sourceName:'Ignite Digital', pubDate:new Date().toISOString(), title:'News temporarily unavailable', link:'#',
             description:'We’re having trouble fetching news feeds. Content will appear here once available.'
@@ -479,23 +565,14 @@
         }
 
         const scored = aggregated.map(item => ({item, score: scoreArticle(item)}))
-                                 .sort((a,b)=> b.score - a.score || new Date(b.item.pubDate) - new Date(a.item.pubDate));
+                                 .sort((a,b)=> b.score - a.score || (Date.parse(b.item.pubDate||0) - Date.parse(a.item.pubDate||0)));
 
+        // cap & diversify
         const TOP_N = 40;
         let top = scored.slice(0, TOP_N).map(s=>s.item);
 
-        const DIVERSITY_PERCENT = 0.12;
-        const generalTech = aggregated
-          .filter(i => ["software","product","startup","funding","apps","hardware","cloud","saas"].some(
-            k => (`${i.title} ${i.description}`.toLowerCase().includes(k))
-          ))
-          .sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate))
-          .slice(0, Math.ceil(TOP_N * DIVERSITY_PERCENT));
-
-        const links = new Set(top.map(i=>i.link));
-        for(const g of generalTech){ if(!links.has(g.link)) top.push(g); }
-
-        top.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
+        // ensure freshness ordering finally
+        top.sort((a,b)=> Date.parse(b.pubDate||0) - Date.parse(a.pubDate||0));
         articlesPool = top.slice(0,30);
 
         newsTicker.innerHTML = `<span class="ticker-item">${articlesPool.map(i => `••• ${i.title} `).join('')}</span>`;
@@ -528,20 +605,10 @@
 
     function renderArticle(item, type) {
       const summaryLen = type === 'featured' ? 190 : 90;
-      const safeTruncate = (typeof window.truncateText === 'function')
-        ? window.truncateText
-        : (text, maxLength) => {
-            if (!text) return '';
-            const cleaned = String(text).replace(/<[^>]*>/g, '');
-            if (cleaned.length <= maxLength) return cleaned;
-            const cut = cleaned.slice(0, maxLength);
-            const lastSpace = cut.lastIndexOf(' ');
-            return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '…';
-          };
 
       const srcName = (item.sourceName || "").trim();
       const html = item.description || '';
-      const imageUrl = extractImageUrl({ description: html, content_html: html });
+      const imageUrl = extractImageUrl(item);
       let primarySrc;
       if (imageUrl) {
           primarySrc = imageUrl;
@@ -570,7 +637,7 @@
                 <span class="time-ago">${formatTimeAgo(pub)}</span>
             </div>
             <h2 class="article-title"><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h2>
-            <p class="article-summary">${safeTruncate(html, summaryLen)}</p>
+            <p class="article-summary">${truncateText(html, summaryLen)}</p>
         </div>
       </div>`;
     }
