@@ -344,28 +344,35 @@
     }
     
     function fetchTomTomTravelTime() {
-      const apiKey = 'JU0CF4lFiUjrmA30OEiLIuTZtnrTuqYE'; // <-- PASTE YOUR KEY HERE
-      const outputDiv = document.getElementById('travel-time-text');
-      
-      const locations = '-79.7450,43.5952:-79.3813,43.6454';
-      
-      const apiUrl = `https://api.tomtom.com/routing/1/calculateRoute/${locations}/json?traffic=true&travelMode=car&key=${apiKey}`;
+  const apiKey = 'JU0CF4lFiUjrmA30OEiLIuTZtnrTuqYE';
+  const outputDiv = document.getElementById('travel-time-text');
 
-      fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-          if (!data || !data.routes || data.routes.length === 0) {
-            throw new Error('Invalid API response from TomTom');
-          }
-          const durationInSeconds = data.routes[0].summary.travelTimeInSeconds;
-          const durationInMinutes = Math.round(durationInSeconds / 60);
-          outputDiv.innerHTML = `To Union Station: <span style="color: #EF7F2B;">${durationInMinutes} mins</span>`;
-        })
-        .catch(error => {
-          outputDiv.innerText = 'Travel time unavailable.';
-          console.error('Error fetching TomTom data:', error);
-        });
-    }
+  // Mississauga (near Winston Churchill & 401) -> Union Station, Toronto
+  // Format MUST be: startLat,startLon:endLat,endLon
+  const locations = '43.5952,-79.7450:43.6454,-79.3813';
+
+  const apiUrl = `https://api.tomtom.com/routing/1/calculateRoute/${locations}/json?routeType=fastest&traffic=true&travelMode=car&key=${apiKey}`;
+
+  fetch(apiUrl)
+    .then(async (res) => {
+      if (!res.ok) {
+        const text = await res.text().catch(()=>'');
+        throw new Error(`TomTom ${res.status} ${text}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      const route = data?.routes?.[0];
+      if (!route?.summary?.travelTimeInSeconds) throw new Error('Invalid API response from TomTom');
+      const mins = Math.round(route.summary.travelTimeInSeconds / 60);
+      outputDiv.innerHTML = `To Union Station: <span style="color:#EF7F2B;">${mins} mins</span>`;
+    })
+    .catch((error) => {
+      outputDiv.innerText = 'Travel time unavailable.';
+      console.error('Error fetching TomTom data:', error);
+    });
+}
+
 
     async function fetchNews(){
       try{
@@ -596,4 +603,3 @@
   </script>
 </body>
 </html>
-
