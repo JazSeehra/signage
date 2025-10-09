@@ -54,26 +54,28 @@
       flex:1 1 auto; display:flex; flex-direction:column; overflow:hidden; min-height:0;
     }
 
+    /* Header (centered & larger) */
     .header{
-      display:flex; justify-content:space-between; align-items:center; gap:16px;
-      background:var(--panel-bg); border-bottom:1px solid var(--border-color); padding:14px 26px;
-      flex:0 0 auto;
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      background:var(--panel-bg); border-bottom:1px solid var(--border-color); padding:18px 26px;
+      flex:0 0 auto; text-align:center;
     }
-    .brand{display:flex; align-items:center; gap:12px}
-    .brand img{height:36px; width:auto; display:block}
-    .brand h1{margin:0; font-size:1.1rem; font-weight:800; color:#111827}
+    .brand{display:flex; align-items:center; gap:12px; justify-content:center}
+    .brand img{height:44px; width:auto; display:block}
+    .brand h1{margin:0; font-size:1.9rem; font-weight:900; color:#111827; letter-spacing:.2px}
 
-    /* Clocks */
-    #clock{
-      display:flex; flex-wrap:wrap; gap:14px; justify-content:flex-end;
-      font-weight:700; color:#334155
+    /* Timezones just below header, centered & slightly larger than header */
+    #timezones{
+      display:flex; flex-wrap:wrap; gap:14px; justify-content:center;
+      font-weight:800; color:#334155; padding:10px 18px;
+      background:var(--panel-bg); border-bottom:1px solid var(--border-color);
     }
-    #clock .tz{
-      display:flex; align-items:center; gap:8px;
+    #timezones .tz{
+      display:flex; align-items:center; gap:10px;
       background:var(--panel-subtle); border:1px solid var(--border-color);
-      padding:8px 14px; border-radius:12px; font-size:1.4rem;
+      padding:10px 16px; border-radius:14px; font-size:2.05rem; /* slightly larger than header */
     }
-    #clock .tz .tz-abbr{font-weight:800; color:#111827}
+    #timezones .tz .tz-abbr{font-weight:900; color:#111827}
 
     .widget{
       background:var(--panel-bg); border:1px solid var(--border-color);
@@ -81,7 +83,7 @@
     }
     .widget-title{
       margin:0 0 12px 0; padding-bottom:10px;
-      font-size:.98rem; font-weight:800; color:#111827;
+      font-size:1.05rem; font-weight:800; color:#111827;
       border-bottom:1px solid #EEF2F6;
     }
 
@@ -130,23 +132,14 @@
     .ticker-item{display:inline-block; padding:0 2rem}
     @keyframes ticker{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-100%,0,0)}}
 
-    /* -------- Smooth, per-block crossfades -------- */
+    /* Crossfades */
     .fade-host { position: relative; min-height: 1px; }
     .fade-host > * { will-change: opacity, transform; }
-
     .fade-enter { opacity:0; transform: translateY(6px); }
-    .fade-enter.fade-enter-active {
-      opacity:1; transform:none;
-      transition: opacity .35s ease, transform .35s ease;
-    }
-
+    .fade-enter.fade-enter-active { opacity:1; transform:none; transition: opacity .35s ease, transform .35s ease; }
     .fade-exit { opacity:1; transform:none; }
-    .fade-exit.fade-exit-active {
-      opacity:0; transform: translateY(-6px);
-      transition: opacity .28s ease, transform .28s ease;
-    }
+    .fade-exit.fade-exit-active { opacity:0; transform: translateY(-6px); transition: opacity .28s ease, transform .28s ease; }
 
-    /* New grid wrapper to keep row layout while crossfading */
     .grid-swap{
       display:grid;
       grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));
@@ -154,11 +147,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .fade-enter, .fade-enter-active,
-      .fade-exit,  .fade-exit-active {
-        transition: none !important;
-        transform: none !important;
-      }
+      .fade-enter, .fade-enter-active, .fade-exit, .fade-exit-active { transition: none !important; transform: none !important; }
     }
   </style>
 </head>
@@ -172,12 +161,13 @@
         <div id="weather-content"></div>
       </div>
 
+      <!-- MULTI-COMMUTE WIDGET -->
       <div id="commute-widget" class="widget">
         <h3 class="widget-title">Live Commute</h3>
-        <div id="travel-time-text" style="font-size: 1.5rem; text-align: center; font-weight: bold;">
-          Loading...
-        </div>
+        <div id="travel-times"></div>
+        <div id="travel-updated" style="margin-top:6px; color:#6B7280; font-size:.85rem;"></div>
       </div>
+
       <div id="quote-widget" class="widget">
         <h3 class="widget-title">Quote</h3>
         <div id="quote-content"></div>
@@ -189,13 +179,16 @@
     </aside>
 
     <div class="main-content">
+      <!-- Centered header -->
       <header class="header">
         <div class="brand">
           <img src="https://ignitedigital.com/wp-content/uploads/2025/07/Ignite-Digital-Logo.png" alt="Ignite Digital logo" />
           <h1>Tech & Marketing Briefing</h1>
         </div>
-        <div id="clock"></div>
       </header>
+
+      <!-- Timezones bar (centered, slightly larger than header) -->
+      <div id="timezones"></div>
 
       <div class="news-container">
         <main id="featured-article" class="fade-host"></main>
@@ -209,7 +202,7 @@
   </footer>
 
   <script>
-    /* ===== Error banner so a tiny bug doesn’t look like “blank page” ===== */
+    /* ===== Error banner ===== */
     (function(){
       const bar = document.getElementById('errbar');
       const txt = document.getElementById('errtxt');
@@ -246,7 +239,7 @@
     let articlesPool = [];
     let currentArticleIndex = 0;
 
-    const clockElement      = document.getElementById('clock');
+    const tzElement         = document.getElementById('timezones');
     const weatherContent    = document.getElementById('weather-content');
     const featuredContainer = document.getElementById('featured-article');
     const gridContainer     = document.getElementById('grid-container');
@@ -255,12 +248,13 @@
     const quoteContent      = document.getElementById('quote-content');
 
     /* ========================== UTIL ========================== */
-    function updateClock(){
+    function updateTimezones(){
       const now = new Date();
       const options = {hour:'2-digit', minute:'2-digit'};
       const local = now.toLocaleTimeString([], options);
 
       const zones = {
+        Local: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local',
         EST: 'America/New_York',
         CST: 'America/Chicago',
         MST: 'America/Denver',
@@ -268,14 +262,11 @@
       };
 
       const tzHtml = Object.entries(zones).map(([abbr, tz])=>{
-        const t = now.toLocaleTimeString([], {...options, timeZone: tz});
+        const t = abbr === 'Local' ? local : now.toLocaleTimeString([], {...options, timeZone: tz});
         return `<div class="tz"><span class="tz-abbr">${abbr}</span> ${t}</div>`;
       }).join('');
 
-      clockElement.innerHTML = `
-        <div class="tz"><span class="tz-abbr">Local</span> ${local}</div>
-        ${tzHtml}
-      `;
+      tzElement.innerHTML = tzHtml;
     }
 
     function truncateText(text, maxLength){
@@ -311,7 +302,6 @@
       wrapper.innerHTML = renderArticle(item, type).trim();
       return wrapper.firstElementChild;
     }
-
     function crossfadeReplace(host, nextNode) {
       const prev = host.firstElementChild;
       nextNode.classList.add('fade-enter');
@@ -325,8 +315,7 @@
       nextNode.addEventListener('transitionend', () => { nextNode.classList.remove('fade-enter', 'fade-enter-active'); }, { once: true });
     }
 
-    /* ========================== DATA FETCHING FUNCTIONS ========================== */
-
+    /* ========================== WEATHER ========================== */
     async function fetchWeather(){
       try{
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);
@@ -342,38 +331,98 @@
         weatherContent.innerHTML = `<small style="color:var(--text-muted)">Weather unavailable.</small>`;
       }
     }
-    
-    function fetchTomTomTravelTime() {
-  const apiKey = 'JU0CF4lFiUjrmA30OEiLIuTZtnrTuqYE';
-  const outputDiv = document.getElementById('travel-time-text');
 
-  // Mississauga (near Winston Churchill & 401) -> Union Station, Toronto
-  // Format MUST be: startLat,startLon:endLat,endLon
-  const locations = '43.5952,-79.7450:43.6454,-79.3813';
+    /* ========================== MULTI-COMMUTE (15 min) ========================== */
+    const TOMTOM_API_KEY = 'JU0CF4lFiUjrmA30OEiLIuTZtnrTuqYE';
 
-  const apiUrl = `https://api.tomtom.com/routing/1/calculateRoute/${locations}/json?routeType=fastest&traffic=true&travelMode=car&key=${apiKey}`;
+    // Origin (Mississauga) — ensure LAT,LON order when building paths
+    const ORIGIN = { lat: 43.5952, lon: -79.7450 };
 
-  fetch(apiUrl)
-    .then(async (res) => {
+    // Destinations to geocode once, then reuse (4 total)
+    const DESTINATIONS = [
+      { label: 'Union Station (Toronto)',          query: 'Union Station, Toronto ON' },
+      { label: 'Shoppers World (Brampton)',        query: 'Shoppers World, Brampton ON' },
+      { label: 'Square One (Mississauga)',         query: 'Square One, Mississauga ON' },
+      { label: 'Churchill Meadows (Mississauga)',  query: 'Churchill Meadows, Mississauga ON' }
+    ];
+
+    const GEO_CACHE = new Map();
+
+    async function geocodePlace(query) {
+      if (GEO_CACHE.has(query)) return GEO_CACHE.get(query);
+      const url = `https://api.tomtom.com/search/2/search/${encodeURIComponent(query)}.json?key=${TOMTOM_API_KEY}&limit=1&countrySet=CA`;
+      const res = await fetch(url);
       if (!res.ok) {
-        const text = await res.text().catch(()=>'');
-        throw new Error(`TomTom ${res.status} ${text}`);
+        const t = await res.text().catch(()=> '');
+        throw new Error(`Geocode ${res.status} ${t}`);
       }
-      return res.json();
-    })
-    .then((data) => {
-      const route = data?.routes?.[0];
-      if (!route?.summary?.travelTimeInSeconds) throw new Error('Invalid API response from TomTom');
-      const mins = Math.round(route.summary.travelTimeInSeconds / 60);
-      outputDiv.innerHTML = `To Union Station: <span style="color:#EF7F2B;">${mins} mins</span>`;
-    })
-    .catch((error) => {
-      outputDiv.innerText = 'Travel time unavailable.';
-      console.error('Error fetching TomTom data:', error);
-    });
-}
+      const data = await res.json();
+      const pos = data?.results?.[0]?.position;
+      if (!pos?.lat || !pos?.lon) throw new Error(`No geocode result for "${query}"`);
+      const coord = { lat: pos.lat, lon: pos.lon };
+      GEO_CACHE.set(query, coord);
+      return coord;
+    }
 
+    async function getTomTomMinutes(origin, destCoord) {
+      const path = `${origin.lat},${origin.lon}:${destCoord.lat},${destCoord.lon}`; // LAT,LON:LAT,LON
+      const url  = `https://api.tomtom.com/routing/1/calculateRoute/${path}/json?routeType=fastest&traffic=true&travelMode=car&key=${TOMTOM_API_KEY}`;
+      const res  = await fetch(url);
+      if (!res.ok) {
+        const t = await res.text().catch(()=> '');
+        throw new Error(`TomTom ${res.status} ${t}`);
+      }
+      const data = await res.json();
+      const secs = data?.routes?.[0]?.summary?.travelTimeInSeconds;
+      if (!secs) throw new Error('Invalid TomTom response shape');
+      return Math.round(secs / 60);
+    }
 
+    function renderCommuteSkeleton() {
+      const listHost = document.getElementById('travel-times');
+      listHost.innerHTML = DESTINATIONS.map(d =>
+        `<div class="commute-row" data-label="${d.label}" style="display:flex; justify-content:space-between; padding:8px 10px; border:1px solid var(--border-color); border-radius:10px; margin-bottom:8px; background:var(--panel-subtle);">
+          <div style="font-weight:700;">${d.label}</div>
+          <div class="commute-time" style="font-weight:800; color:#EF7F2B;">…</div>
+        </div>`
+      ).join('');
+    }
+
+    async function fetchAllCommutes() {
+      const listHost = document.getElementById('travel-times');
+      const tsEl = document.getElementById('travel-updated');
+      if (!listHost.children.length) renderCommuteSkeleton();
+
+      try {
+        // Geocode all (once) then route all in parallel
+        const coords = await Promise.all(DESTINATIONS.map(d => geocodePlace(d.query)));
+        const results = await Promise.allSettled(coords.map(c => getTomTomMinutes(ORIGIN, c)));
+
+        results.forEach((res, i) => {
+          const row = listHost.querySelectorAll('.commute-row')[i];
+          const timeEl = row?.querySelector('.commute-time');
+          if (!timeEl) return;
+          if (res.status === 'fulfilled') {
+            timeEl.textContent = `${res.value} mins`;
+            timeEl.style.color = '#EF7F2B';
+          } else {
+            timeEl.textContent = '—';
+            timeEl.style.color = '#6B7280';
+            console.error(`Commute "${DESTINATIONS[i].label}" failed:`, res.reason);
+          }
+        });
+
+        const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        tsEl.textContent = `Updated ${ts}`;
+      } catch (e) {
+        console.error('Commutes error:', e);
+        document.getElementById('travel-times').innerHTML =
+          '<small style="color:var(--text-muted)">Travel times unavailable.</small>';
+        document.getElementById('travel-updated').textContent = '';
+      }
+    }
+
+    /* ========================== NEWS / QUOTES / WORD ========================== */
     async function fetchNews(){
       try{
         const aggregated = [];
@@ -586,16 +635,16 @@
     }
 
     /* ========================== INIT & TIMERS ========================== */
-    updateClock();
+    updateTimezones();
     fetchWeather();
-    fetchTomTomTravelTime();
+    fetchAllCommutes();          // First load
     fetchNews();
     fetchQuote();
     fetchWordOfTheDay();
 
-    setInterval(updateClock, 1000); // clock
-    setInterval(fetchWeather, 60 * 60 * 1000); // hourly
-    setInterval(fetchTomTomTravelTime, 900000); // 15 min
+    setInterval(updateTimezones, 1000);          // timezones refresh every second
+    setInterval(fetchWeather, 60 * 60 * 1000);   // hourly
+    setInterval(fetchAllCommutes, 900000);       // every 15 min
     setInterval(fetchNews, 30 * 60 * 1000);      // 30 min refresh
     setInterval(rotateArticles, 30 * 1000);      // rotate display
     setInterval(fetchQuote, 10 * 60 * 1000);
@@ -603,4 +652,3 @@
   </script>
 </body>
 </html>
-
